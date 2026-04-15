@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Nova AI – Your intelligent conversational AI assistant powered by cutting-edge AI.">
+    <title>Nova AI – Intelligent Assistant</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <!-- Toast Notification -->
+    <div id="toast" class="toast" role="alert"></div>
+
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <div class="logo-icon">
+                        <i class="fa-solid fa-bolt"></i>
+                    </div>
+                    <div class="logo-text">
+                        <span class="logo-name">Nova AI</span>
+                        <span class="logo-tag">Pro</span>
+                    </div>
+                </div>
+                <button class="new-chat-btn" id="new-chat">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>New Chat</span>
+                </button>
+            </div>
+
+            <div class="sidebar-content">
+                <p class="sidebar-section-title">
+                    <i class="fa-regular fa-clock"></i> Recent
+                </p>
+                <div class="chat-history-list" id="chat-history"></div>
+            </div>
+
+            <div class="sidebar-footer">
+                <div class="sidebar-footer-actions">
+                    <button class="footer-btn" id="export-btn" title="Export Chat">
+                        <i class="fa-solid fa-download"></i>
+                        <span>Export</span>
+                    </button>
+                    <button class="footer-btn" id="clear-all-btn" title="Clear All History">
+                        <i class="fa-solid fa-trash"></i>
+                        <span>Clear All</span>
+                    </button>
+                </div>
+                <div class="user-profile">
+                    <div class="avatar">
+                        <i class="fa-solid fa-user"></i>
+                    </div>
+                    <div class="user-info">
+                        <span class="username">Guest User</span>
+                        <span class="user-status"><i class="fa-solid fa-circle"></i> Online</span>
+                    </div>
+                    <button class="footer-icon-btn" id="theme-toggle" title="Toggle Theme">
+                        <i class="fa-regular fa-moon"></i>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <main class="chat-area">
+            <!-- Header -->
+            <header class="chat-header">
+                <button class="sidebar-toggle" id="sidebar-toggle" title="Toggle Sidebar">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                <div class="header-center">
+                    <div class="model-badge">
+                        <i class="fa-solid fa-microchip"></i>
+                        <span id="current-model">gemini-2.5-flash</span>
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </div>
+                    <!-- Model dropdown -->
+                    <div class="model-dropdown" id="model-dropdown">
+                        <div class="model-option active" data-model="gemini-2.5-flash">
+                            <div class="model-icon"><i class="fa-solid fa-bolt"></i></div>
+                            <div class="model-info">
+                                <span class="model-name">Gemini 2.5 Flash</span>
+                                <span class="model-desc">Fast & efficient</span>
+                            </div>
+                        </div>
+                        <div class="model-option" data-model="gemini-2.0-flash">
+                            <div class="model-icon"><i class="fa-solid fa-rocket"></i></div>
+                            <div class="model-info">
+                                <span class="model-name">Gemini 2.0 Flash</span>
+                                <span class="model-desc">Previous generation</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <button id="search-btn" class="header-icon-btn" title="Search in chat">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </button>
+                    <button id="copy-session-btn" class="header-icon-btn" title="Copy session link">
+                        <i class="fa-solid fa-share-nodes"></i>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Search Bar (hidden by default) -->
+            <div class="search-bar-container" id="search-bar" style="display:none;">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="search-input" placeholder="Search in this conversation…">
+                <button id="search-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <!-- Chat Window -->
+            <div class="chat-window" id="chat-window">
+                <div class="welcome-screen" id="welcome-screen">
+                    <div class="welcome-glow"></div>
+                    <div class="welcome-icon">
+                        <div class="welcome-icon-bg">
+                            <i class="fa-solid fa-bolt"></i>
+                        </div>
+                    </div>
+                    <h1>Hi, I'm <span class="gradient-text">Nova</span>.</h1>
+                    <p>Your intelligent AI companion. Ask me anything — I'm here to help.</p>
+                    <div class="feature-pills">
+                        <div class="feature-pill"><i class="fa-solid fa-code"></i> Code</div>
+                        <div class="feature-pill"><i class="fa-solid fa-pen-nib"></i> Write</div>
+                        <div class="feature-pill"><i class="fa-solid fa-brain"></i> Analyze</div>
+                        <div class="feature-pill"><i class="fa-solid fa-language"></i> Translate</div>
+                    </div>
+                    <div class="suggested-prompts">
+                        <button class="prompt-chip" onclick="submitSuggested('Explain how neural networks work in simple terms')">
+                            <i class="fa-solid fa-brain"></i> Explain neural networks simply
+                        </button>
+                        <button class="prompt-chip" onclick="submitSuggested('Write a Python function to sort a list of dictionaries by a key')">
+                            <i class="fa-solid fa-code"></i> Sort dict list in Python
+                        </button>
+                        <button class="prompt-chip" onclick="submitSuggested('What are the best practices for REST API design?')">
+                            <i class="fa-solid fa-server"></i> REST API best practices
+                        </button>
+                        <button class="prompt-chip" onclick="submitSuggested('Give me a creative short story idea set in space')">
+                            <i class="fa-solid fa-star"></i> Sci-fi story idea
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Scroll to Bottom Button -->
+            <button class="scroll-to-bottom" id="scroll-to-bottom" style="display:none;" title="Scroll to bottom">
+                <i class="fa-solid fa-chevron-down"></i>
+            </button>
+
+            <!-- Input Area -->
+            <div class="chat-input-container">
+                <div class="input-wrapper">
+                    <div class="input-top">
+                        <textarea id="message-input" placeholder="Message Nova…" rows="1"></textarea>
+                    </div>
+                    <div class="input-bottom">
+                        <div class="input-actions-left">
+                            <button class="input-icon-btn" id="attach-btn" title="Attach file">
+                                <i class="fa-solid fa-paperclip"></i>
+                            </button>
+                            <button class="input-icon-btn" id="browse-prompts-btn" title="Prompt library">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                            </button>
+                        </div>
+                        <div class="input-actions-right">
+                            <span class="char-count" id="char-count">0</span>
+                            <button class="send-btn" id="send-btn" disabled>
+                                <i class="fa-solid fa-arrow-up"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="disclaimer">
+                    Nova AI can make mistakes. Always verify critical information. &nbsp;|&nbsp; Powered by Google Gemini
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Rename Modal -->
+    <div class="modal-overlay" id="rename-modal" style="display:none;">
+        <div class="modal">
+            <h3><i class="fa-solid fa-pencil"></i> Rename Chat</h3>
+            <input type="text" id="rename-input" placeholder="Enter a new name…" maxlength="40">
+            <div class="modal-actions">
+                <button class="modal-btn cancel" id="rename-cancel">Cancel</button>
+                <button class="modal-btn confirm" id="rename-confirm">Rename</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Prompt Library Modal -->
+    <div class="modal-overlay" id="prompts-modal" style="display:none;">
+        <div class="modal prompts-modal">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-wand-magic-sparkles"></i> Prompt Library</h3>
+                <button id="prompts-close" class="close-btn"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="prompts-grid">
+                <div class="prompt-card" data-prompt="Write a professional email to apologize for a missed meeting.">
+                    <i class="fa-solid fa-envelope"></i>
+                    <h4>Business Email</h4>
+                    <p>Write a professional email to apologize...</p>
+                </div>
+                <div class="prompt-card" data-prompt="Create a step-by-step plan to learn Python programming in 30 days.">
+                    <i class="fa-brands fa-python"></i>
+                    <h4>Learning Plan</h4>
+                    <p>Create a 30-day Python learning plan...</p>
+                </div>
+                <div class="prompt-card" data-prompt="Summarize the following text and extract the key points: ">
+                    <i class="fa-solid fa-file-lines"></i>
+                    <h4>Summarize Text</h4>
+                    <p>Summarize and extract key points...</p>
+                </div>
+                <div class="prompt-card" data-prompt="Debug this code and explain the issue:">
+                    <i class="fa-solid fa-bug"></i>
+                    <h4>Debug Code</h4>
+                    <p>Paste your code and get a fix + explanation...</p>
+                </div>
+                <div class="prompt-card" data-prompt="Translate the following text to English: ">
+                    <i class="fa-solid fa-language"></i>
+                    <h4>Translate</h4>
+                    <p>Translate text to English...</p>
+                </div>
+                <div class="prompt-card" data-prompt="Give me 10 creative blog post ideas about technology.">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    <h4>Creative Ideas</h4>
+                    <p>Generate 10 creative blog post ideas...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+        // Configure marked for security
+        marked.setOptions({ breaks: true, gfm: true });
+    </script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

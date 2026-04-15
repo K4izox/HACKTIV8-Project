@@ -1,0 +1,623 @@
+/* =====================================================
+   Nova AI – Main JavaScript  (fully functional)
+   ===================================================== */
+
+document.addEventListener('DOMContentLoaded', () => {
+
+    /* ── DOM Refs ─────────────────────────────────── */
+    const messageInput     = document.getElementById('message-input');
+    const sendBtn          = document.getElementById('send-btn');
+    const chatWindow       = document.getElementById('chat-window');
+    const welcomeScreen    = document.getElementById('welcome-screen');
+    const themeToggle      = document.getElementById('theme-toggle');
+    const chatHistoryList  = document.getElementById('chat-history');
+    const newChatBtn       = document.getElementById('new-chat');
+    const sidebarToggle    = document.getElementById('sidebar-toggle');
+    const sidebar          = document.getElementById('sidebar');
+    const exportBtn        = document.getElementById('export-btn');
+    const clearAllBtn      = document.getElementById('clear-all-btn');
+    const charCount        = document.getElementById('char-count');
+    const scrollDownBtn    = document.getElementById('scroll-to-bottom');
+    const searchBtn        = document.getElementById('search-btn');
+    const searchBar        = document.getElementById('search-bar');
+    const searchInput      = document.getElementById('search-input');
+    const searchClose      = document.getElementById('search-close');
+    const modelBadge       = document.querySelector('.model-badge');
+    const modelDropdown    = document.getElementById('model-dropdown');
+    const currentModelEl   = document.getElementById('current-model');
+    const attachBtn        = document.getElementById('attach-btn');
+    const browsePromptsBtn = document.getElementById('browse-prompts-btn');
+    const promptsModal     = document.getElementById('prompts-modal');
+    const promptsClose     = document.getElementById('prompts-close');
+    const renameModal      = document.getElementById('rename-modal');
+    const renameInput      = document.getElementById('rename-input');
+    const renameConfirm    = document.getElementById('rename-confirm');
+    const renameCancel     = document.getElementById('rename-cancel');
+    const copySessionBtn   = document.getElementById('copy-session-btn');
+
+    /* ── State ────────────────────────────────────── */
+    let sessionId            = sessionStorage.getItem('chat_session_id') || null;
+    let isWaiting            = false;
+    let currentModel         = localStorage.getItem('nova-model') || 'gemini-2.5-flash';
+    let renameTargetId       = null;
+    let searchActive         = false;
+    let welcomeDetached      = false; // tracks whether welcome was removed from DOM
+
+    /* ── Init ─────────────────────────────────────── */
+    sendBtn.disabled = true;
+    applyModelUI(currentModel);
+
+    if (sessionId) {
+        loadSessionHistory(sessionId);   // will detach welcome screen
+    }
+    loadSessions();
+
+    /* ═══════════════════════════════════════════════
+       TOAST
+    ════════════════════════════════════════════════ */
+    function showToast(msg, ms = 2400) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.classList.add('show');
+        clearTimeout(t._timer);
+        t._timer = setTimeout(() => t.classList.remove('show'), ms);
+    }
+
+    /* ═══════════════════════════════════════════════
+       THEME
+    ════════════════════════════════════════════════ */
+    const savedTheme = localStorage.getItem('nova-theme') || 'dark';
+    if (savedTheme === 'light') {
+        document.body.classList.add('light-theme');
+        themeToggle.querySelector('i').className = 'fa-regular fa-sun';
+    }
+    themeToggle.addEventListener('click', () => {
+        const light = document.body.classList.toggle('light-theme');
+        themeToggle.querySelector('i').className = light ? 'fa-regular fa-sun' : 'fa-regular fa-moon';
+        localStorage.setItem('nova-theme', light ? 'light' : 'dark');
+        showToast(light ? '☀️  Light mode' : '🌙  Dark mode');
+    });
+
+    /* ═══════════════════════════════════════════════
+       SIDEBAR TOGGLE
+    ════════════════════════════════════════════════ */
+    sidebarToggle.addEventListener('click', () => {
+        if (window.innerWidth <= 768) sidebar.classList.toggle('mobile-open');
+        else                          sidebar.classList.toggle('collapsed');
+    });
+    // Close mobile sidebar on outside click
+    document.addEventListener('click', (e) => {
+        if (window.innerWidth <= 768 &&
+            sidebar.classList.contains('mobile-open') &&
+            !sidebar.contains(e.target) &&
+            e.target !== sidebarToggle) {
+            sidebar.classList.remove('mobile-open');
+        }
+    });
+
+    /* ═══════════════════════════════════════════════
+       MODEL PICKER
+    ════════════════════════════════════════════════ */
+    modelBadge.addEventListener('click', (e) => {
+        e.stopPropagation();
+        modelDropdown.classList.toggle('open');
+    });
+    document.addEventListener('click', () => modelDropdown.classList.remove('open'));
+
+    document.querySelectorAll('.model-option').forEach(opt => {
+        opt.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const model = opt.dataset.model;
+            currentModel = model;
+            localStorage.setItem('nova-model', model);
+            applyModelUI(model);
+            modelDropdown.classList.remove('open');
+            showToast(`⚡ Switched to ${model}`);
+        });
+    });
+
+    function applyModelUI(model) {
+        currentModelEl.textContent = model;
+        document.querySelectorAll('.model-option').forEach(o => {
+            o.classList.toggle('active', o.dataset.model === model);
+        });
+    }
+
+    /* ═══════════════════════════════════════════════
+       TEXTAREA
+    ════════════════════════════════════════════════ */
+    messageInput.addEventListener('input', () => {
+        messageInput.style.height = 'auto';
+        messageInput.style.height = Math.min(messageInput.scrollHeight, 200) + 'px';
+        const len = messageInput.value.length;
+        charCount.textContent = len;
+        charCount.className = 'char-count' + (len > 3800 ? ' danger' : len > 3000 ? ' warning' : '');
+        sendBtn.disabled = messageInput.value.trim() === '' || isWaiting;
+    });
+    messageInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+    });
+    sendBtn.addEventListener('click', sendMessage);
+
+    /* ═══════════════════════════════════════════════
+       NEW CHAT
+    ════════════════════════════════════════════════ */
+    newChatBtn.addEventListener('click', startNewChat);
+
+    function startNewChat() {
+        sessionStorage.removeItem('chat_session_id');
+        sessionId = null;
+        welcomeDetached = false;
+
+        // Clear all messages and re-attach welcome screen
+        chatWindow.innerHTML = '';
+        chatWindow.appendChild(welcomeScreen);
+        welcomeScreen.style.display = 'flex'; // welcome uses flexbox centering
+
+        messageInput.value = '';
+        messageInput.style.height = 'auto';
+        charCount.textContent = '0';
+        sendBtn.disabled = true;
+        scrollDownBtn.style.display = 'none';
+        loadSessions();
+        if (window.innerWidth <= 768) sidebar.classList.remove('mobile-open');
+    }
+
+    /* ═══════════════════════════════════════════════
+       SCROLL TO BOTTOM
+    ════════════════════════════════════════════════ */
+    chatWindow.addEventListener('scroll', () => {
+        const near = chatWindow.scrollHeight - chatWindow.scrollTop - chatWindow.clientHeight < 120;
+        scrollDownBtn.style.display = near ? 'none' : 'flex';
+    });
+    scrollDownBtn.addEventListener('click', scrollToBottom);
+
+    /* ═══════════════════════════════════════════════
+       SEARCH
+    ════════════════════════════════════════════════ */
+    searchBtn.addEventListener('click', () => {
+        searchActive = !searchActive;
+        searchBar.style.display = searchActive ? 'flex' : 'none';
+        if (searchActive) searchInput.focus();
+        else              clearHighlights();
+    });
+    searchClose.addEventListener('click', () => {
+        searchActive = false;
+        searchBar.style.display = 'none';
+        clearHighlights();
+        searchInput.value = '';
+    });
+    searchInput.addEventListener('input', () => {
+        clearHighlights();
+        const q = searchInput.value.trim().toLowerCase();
+        if (!q) return;
+        chatWindow.querySelectorAll('.message-bubble').forEach(b => highlightText(b, q));
+    });
+
+    function highlightText(root, q) {
+        const iter = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+        const hits = [];
+        let n;
+        while ((n = iter.nextNode())) hits.push(n);
+        hits.forEach(node => {
+            const idx = node.textContent.toLowerCase().indexOf(q);
+            if (idx < 0) return;
+            const mark = document.createElement('mark');
+            mark.className = 'highlight';
+            const after = node.splitText(idx);
+            after.splitText(q.length);
+            node.after(mark);
+            mark.appendChild(after);
+        });
+    }
+    function clearHighlights() {
+        chatWindow.querySelectorAll('mark.highlight').forEach(m => {
+            m.replaceWith(document.createTextNode(m.textContent));
+        });
+        chatWindow.normalize();
+    }
+
+    /* ═══════════════════════════════════════════════
+       EXPORT CHAT
+    ════════════════════════════════════════════════ */
+    exportBtn.addEventListener('click', () => {
+        const msgs = chatWindow.querySelectorAll('.message-container');
+        if (!msgs.length) { showToast('💬 No chat to export.'); return; }
+        let out = `Nova AI – Chat Export\n${'='.repeat(40)}\n\n`;
+        msgs.forEach(c => {
+            const who  = c.classList.contains('user') ? 'You' : 'Nova';
+            const text = (c.querySelector('.message-bubble')?.innerText || '').trim();
+            out += `${who}:\n${text}\n\n`;
+        });
+        const a   = Object.assign(document.createElement('a'), {
+            href:     URL.createObjectURL(new Blob([out], { type: 'text/plain' })),
+            download: `nova-chat-${new Date().toISOString().slice(0,10)}.txt`,
+        });
+        a.click();
+        showToast('📄 Chat exported!');
+    });
+
+    /* ═══════════════════════════════════════════════
+       CLEAR ALL
+    ════════════════════════════════════════════════ */
+    clearAllBtn.addEventListener('click', () => {
+        if (!confirm('Delete all chat history? This cannot be undone.')) return;
+        fetch('/api/sessions/clear', { method: 'POST' })
+            .then(r => { if (!r.ok) throw new Error(); })
+            .then(() => { startNewChat(); showToast('🗑️  All chats cleared.'); })
+            .catch(() => showToast('❌ Error clearing chats.'));
+    });
+
+    /* ═══════════════════════════════════════════════
+       COPY SESSION LINK
+    ════════════════════════════════════════════════ */
+    copySessionBtn.addEventListener('click', () => {
+        const link = window.location.origin + '/?session=' + (sessionId || '');
+        navigator.clipboard.writeText(link)
+            .then(()  => showToast('🔗 Session link copied!'))
+            .catch(()  => showToast('❌ Could not copy link.'));
+    });
+
+    /* ═══════════════════════════════════════════════
+       ATTACH FILE (placeholder)
+    ════════════════════════════════════════════════ */
+    attachBtn.addEventListener('click', () => showToast('📎 File upload coming soon!'));
+
+    /* ═══════════════════════════════════════════════
+       PROMPT LIBRARY
+    ════════════════════════════════════════════════ */
+    browsePromptsBtn.addEventListener('click', () => promptsModal.style.display = 'flex');
+    promptsClose.addEventListener('click',     () => promptsModal.style.display = 'none');
+    promptsModal.addEventListener('click', (e) => { if (e.target === promptsModal) promptsModal.style.display = 'none'; });
+    document.querySelectorAll('.prompt-card').forEach(card => {
+        card.addEventListener('click', () => {
+            messageInput.value = card.dataset.prompt;
+            messageInput.dispatchEvent(new Event('input'));
+            promptsModal.style.display = 'none';
+            messageInput.focus();
+        });
+    });
+
+    /* ═══════════════════════════════════════════════
+       RENAME MODAL
+    ════════════════════════════════════════════════ */
+    renameConfirm.addEventListener('click', async () => {
+        const title = renameInput.value.trim();
+        if (!title || !renameTargetId) return;
+        try {
+            const r = await fetch(`/api/sessions/${renameTargetId}/rename`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title }),
+            });
+            if (!r.ok) throw new Error();
+            renameModal.style.display = 'none';
+            loadSessions();
+            showToast('✏️  Chat renamed!');
+        } catch { showToast('❌ Rename failed.'); }
+    });
+    renameInput.addEventListener('keydown', e => { if (e.key === 'Enter') renameConfirm.click(); });
+    renameCancel.addEventListener('click', () => renameModal.style.display = 'none');
+    renameModal.addEventListener('click', (e) => { if (e.target === renameModal) renameModal.style.display = 'none'; });
+
+    /* ═══════════════════════════════════════════════
+       LOAD SESSION LIST (Sidebar)
+    ════════════════════════════════════════════════ */
+    async function loadSessions() {
+        try {
+            const r    = await fetch('/api/sessions');
+            const data = await r.json();
+            chatHistoryList.innerHTML = '';
+
+            if (!data.sessions || !data.sessions.length) {
+                chatHistoryList.innerHTML = '<div style="color:var(--text-muted);font-size:.8rem;padding:8px 6px;">No chats yet.</div>';
+                return;
+            }
+
+            data.sessions.forEach(s => {
+                const div = document.createElement('div');
+                div.className = `history-item ${s.id === sessionId ? 'active' : ''}`;
+                // safe text insertion
+                div.innerHTML = `
+                    <i class="fa-regular fa-message"></i>
+                    <span></span>
+                    <div class="history-actions">
+                        <button class="history-action-btn rename" title="Rename"><i class="fa-solid fa-pencil"></i></button>
+                        <button class="history-action-btn delete" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                `;
+                div.querySelector('span').textContent = s.title;
+                div.querySelector('span').title       = s.title;
+
+                // click = load
+                div.addEventListener('click', async (e) => {
+                    if (e.target.closest('.history-actions')) return;
+                    sessionId = s.id;
+                    sessionStorage.setItem('chat_session_id', s.id);
+                    document.querySelectorAll('.history-item').forEach(h => h.classList.remove('active'));
+                    div.classList.add('active');
+                    await loadSessionHistory(s.id);
+                    if (window.innerWidth <= 768) sidebar.classList.remove('mobile-open');
+                });
+
+                // rename
+                div.querySelector('.rename').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    renameTargetId    = s.id;
+                    renameInput.value = s.title;
+                    renameModal.style.display = 'flex';
+                    setTimeout(() => renameInput.focus(), 50);
+                });
+
+                // delete
+                div.querySelector('.delete').addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    if (!confirm(`Delete "${s.title}"?`)) return;
+                    try {
+                        const r = await fetch(`/api/sessions/${s.id}`, { method: 'DELETE' });
+                        if (!r.ok) throw new Error();
+                        showToast('🗑️  Chat deleted.');
+                        if (s.id === sessionId) startNewChat();
+                        else loadSessions();
+                    } catch { showToast('❌ Delete failed.'); }
+                });
+
+                chatHistoryList.appendChild(div);
+            });
+        } catch (err) {
+            console.error('loadSessions error:', err);
+        }
+    }
+
+    /* ═══════════════════════════════════════════════
+       LOAD HISTORY FOR A SPECIFIC SESSION
+    ════════════════════════════════════════════════ */
+    async function loadSessionHistory(id) {
+        try {
+            const r = await fetch(`/api/sessions/${id}`);
+            if (!r.ok) { startNewChat(); return; }
+            const data = await r.json();
+
+            // detach welcome screen; clear messages
+            if (welcomeScreen.parentNode) welcomeScreen.remove();
+            welcomeDetached = true;
+            chatWindow.innerHTML = '';
+
+            data.history.forEach(m => appendMessage(m.sender, m.text, m.time));
+
+            // restore model used in this session
+            if (data.model) applyModelUI(data.model);
+
+            scrollToBottom();
+        } catch (err) {
+            console.error('loadSessionHistory error:', err);
+        }
+    }
+
+    /* ═══════════════════════════════════════════════
+       SEND MESSAGE
+    ════════════════════════════════════════════════ */
+    async function sendMessage() {
+        const message = messageInput.value.trim();
+        if (!message || isWaiting) return;
+
+        // Remove welcome screen on first send
+        if (welcomeScreen.parentNode === chatWindow) {
+            welcomeScreen.remove();
+            welcomeDetached = true;
+        }
+
+        appendMessage('user', message);
+        messageInput.value = '';
+        messageInput.style.height = 'auto';
+        charCount.textContent = '0';
+        sendBtn.disabled = true;
+        isWaiting = true;
+
+        const typingId = showTyping();
+        scrollToBottom();
+
+        try {
+            const resp = await fetch('/chat', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ message, session_id: sessionId, model: currentModel }),
+            });
+            const data = await resp.json();
+            removeEl(typingId);
+
+            if (resp.ok) {
+                const isNewSession = sessionId !== data.session_id;
+                sessionId = data.session_id;
+                sessionStorage.setItem('chat_session_id', sessionId);
+                appendMessage('ai', data.response);
+                if (isNewSession) loadSessions(); // new item appears in sidebar
+                else              loadSessions(); // update title if changed
+            } else {
+                appendMessage('ai', `**Error:** ${data.error || 'Something went wrong. Please try again.'}`);
+            }
+        } catch (err) {
+            removeEl(typingId);
+            appendMessage('ai', '**Error:** Cannot reach the server. Make sure `app.py` is running.');
+            console.error('sendMessage error:', err);
+        } finally {
+            isWaiting = false;
+            sendBtn.disabled = messageInput.value.trim() === '';
+            messageInput.focus();
+            scrollToBottom();
+        }
+    }
+
+    /* ═══════════════════════════════════════════════
+       APPEND MESSAGE
+    ════════════════════════════════════════════════ */
+    function appendMessage(sender, text, timeStr) {
+        const time = timeStr || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        const container = document.createElement('div');
+        container.className = `message-container ${sender}`;
+
+        const row = document.createElement('div');
+        row.className = 'message-row';
+
+        // Avatar
+        const avatar = document.createElement('div');
+        avatar.className = 'message-avatar';
+        avatar.innerHTML = sender === 'user'
+            ? '<i class="fa-solid fa-user"></i>'
+            : '<i class="fa-solid fa-bolt"></i>';
+
+        // Content wrapper
+        const content = document.createElement('div');
+        content.className = 'message-content';
+
+        // Bubble
+        const bubble = document.createElement('div');
+        bubble.className = 'message-bubble';
+
+        if (sender === 'ai' && typeof marked !== 'undefined') {
+            bubble.innerHTML = marked.parse(text);
+            // Add copy button to every code block
+            bubble.querySelectorAll('pre').forEach(addCopyCodeBtn);
+        } else {
+            bubble.innerText = text;
+        }
+        content.appendChild(bubble);
+
+        // Meta row (time + action buttons)
+        const meta = document.createElement('div');
+        meta.className = 'message-meta';
+
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'meta-time';
+        timeSpan.textContent = time;
+        meta.appendChild(timeSpan);
+
+        // Copy message button
+        const copyBtn = makeMetaBtn('<i class="fa-regular fa-copy"></i> Copy', () => {
+            navigator.clipboard.writeText(bubble.innerText)
+                .then(()  => showToast('✅ Copied!'))
+                .catch(()  => showToast('❌ Copy failed.'));
+        });
+        meta.appendChild(copyBtn);
+
+        // Retry button (AI only)
+        if (sender === 'ai') {
+            const retryBtn = makeMetaBtn('<i class="fa-solid fa-rotate-right"></i> Retry', async () => {
+                // Find the preceding user message
+                const siblings = [...chatWindow.querySelectorAll('.message-container')];
+                const idx      = siblings.indexOf(container);
+                let userText   = null;
+                for (let i = idx - 1; i >= 0; i--) {
+                    if (siblings[i].classList.contains('user')) {
+                        userText = siblings[i].querySelector('.message-bubble')?.innerText || null;
+                        break;
+                    }
+                }
+                if (!userText) { showToast('⚠️ No user message to retry.'); return; }
+
+                container.remove();
+                isWaiting = true;
+                sendBtn.disabled = true;
+                const tid = showTyping();
+                scrollToBottom();
+
+                try {
+                    const r    = await fetch('/chat', {
+                        method:  'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body:    JSON.stringify({ message: userText, session_id: sessionId, model: currentModel }),
+                    });
+                    const d = await r.json();
+                    removeEl(tid);
+                    if (r.ok) appendMessage('ai', d.response);
+                    else      appendMessage('ai', `**Error:** ${d.error}`);
+                } catch {
+                    removeEl(tid);
+                    appendMessage('ai', '**Error:** Server unreachable.');
+                } finally {
+                    isWaiting = false;
+                    sendBtn.disabled = messageInput.value.trim() === '';
+                    scrollToBottom();
+                }
+            });
+            meta.appendChild(retryBtn);
+        }
+
+        content.appendChild(meta);
+        row.appendChild(avatar);
+        row.appendChild(content);
+        container.appendChild(row);
+        chatWindow.appendChild(container);
+        return container;
+    }
+
+    function makeMetaBtn(html, onClick) {
+        const btn = document.createElement('button');
+        btn.className = 'meta-btn';
+        btn.innerHTML = html;
+        btn.addEventListener('click', onClick);
+        return btn;
+    }
+
+    function addCopyCodeBtn(pre) {
+        // wrap
+        const wrap = document.createElement('div');
+        wrap.className = 'code-block-wrapper';
+        pre.parentNode.insertBefore(wrap, pre);
+        wrap.appendChild(pre);
+
+        const btn = document.createElement('button');
+        btn.className = 'copy-code-btn';
+        btn.innerHTML = '<i class="fa-regular fa-copy"></i> Copy';
+        btn.addEventListener('click', () => {
+            const code = (pre.querySelector('code') || pre).innerText;
+            navigator.clipboard.writeText(code).then(() => {
+                btn.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
+                setTimeout(() => btn.innerHTML = '<i class="fa-regular fa-copy"></i> Copy', 2000);
+            });
+        });
+        wrap.appendChild(btn);
+    }
+
+    /* ═══════════════════════════════════════════════
+       TYPING INDICATOR
+    ════════════════════════════════════════════════ */
+    function showTyping() {
+        const id = 'typing-' + Date.now();
+        const el = document.createElement('div');
+        el.className = 'message-container ai';
+        el.id = id;
+        el.innerHTML = `
+            <div class="message-row">
+                <div class="message-avatar"><i class="fa-solid fa-bolt"></i></div>
+                <div class="message-content">
+                    <div class="message-bubble" style="padding:12px 18px;">
+                        <div class="typing-indicator">
+                            <div class="typing-dot"></div>
+                            <div class="typing-dot"></div>
+                            <div class="typing-dot"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        chatWindow.appendChild(el);
+        return id;
+    }
+
+    /* ═══════════════════════════════════════════════
+       HELPERS
+    ════════════════════════════════════════════════ */
+    function removeEl(id) { document.getElementById(id)?.remove(); }
+    function scrollToBottom() {
+        chatWindow.scrollTo({ top: chatWindow.scrollHeight, behavior: 'smooth' });
+    }
+
+    /* ── Global for inline onclick in HTML ────────── */
+    window.submitSuggested = (txt) => {
+        messageInput.value = txt;
+        messageInput.dispatchEvent(new Event('input'));
+        sendMessage();
+    };
+});
