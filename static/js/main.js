@@ -510,6 +510,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (favs.includes(id)) favs = favs.filter(i => i !== id);
         else favs.push(id);
         localStorage.setItem(SESS_FAV, JSON.stringify(favs));
+        updateFavUI();
     }
 
     /* ══════════════════════════════════════════════
@@ -573,6 +574,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 historyList.appendChild(el);
             });
+            updateFavUI();
         } catch {}
     }
 
@@ -604,10 +606,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function setFavs(f)  { localStorage.setItem(FAV, JSON.stringify(f)); updateFavUI(); }
     function isFaved(t)  { return getFavs().some(f => f.text === t); }
     function updateFavUI() {
-        const n = getFavs().length;
+        const n = getFavs().length + getSessionFavs().length;
         favDot.style.display   = n ? 'block' : 'none';
-        favCount.textContent   = n;
-        favCount.style.display = n ? 'inline-flex' : 'none';
+        if (favCount) {
+            favCount.textContent   = n;
+            favCount.style.display = n ? 'inline-flex' : 'none';
+        }
     }
 
     function openFav() { renderFavModal(); favModal.style.display = 'flex'; }
@@ -616,35 +620,76 @@ document.addEventListener('DOMContentLoaded', () => {
     favClose.addEventListener('click',      () => favModal.style.display = 'none');
     favModal.addEventListener('click',      e => { if (e.target === favModal) favModal.style.display = 'none'; });
 
-    function renderFavModal() {
-        const favs = getFavs(); favList.innerHTML = '';
-        if (!favs.length) {
-            favList.innerHTML = `<div class="empty-state"><i class="fa-regular fa-star"></i><p>No favorites yet</p><span>Hover a message → click ⭐ Save</span></div>`;
+    async function renderFavModal() {
+        const favs = getFavs();
+        const sessFavs = getSessionFavs();
+        favList.innerHTML = '';
+
+        if (!favs.length && !sessFavs.length) {
+            favList.innerHTML = `<div class="empty-state"><i class="fa-regular fa-star"></i><p>No favorites yet</p><span>Pin a chat or save a message</span></div>`;
             return;
         }
-        favs.forEach((fav, idx) => {
-            const item = document.createElement('div'); item.className = 'fav-item';
-            item.innerHTML = `<div class="fav-header">
-                <span class="fav-sender ${fav.sender}">${fav.sender==='user'?'👤 You':'⚡ Nova'}</span>
-                <span class="fav-time">${fav.savedAt||''}</span>
-            </div><div class="fav-text"></div>
-            <div class="fav-actions">
-                <button class="fav-btn-sm copy"><i class="fa-regular fa-copy"></i> Copy</button>
-                <button class="fav-btn-sm rem"><i class="fa-solid fa-star-half-stroke"></i> Remove</button>
-            </div>`;
-            item.querySelector('.fav-text').textContent = fav.text;
-            item.querySelector('.copy').addEventListener('click', () => {
-                navigator.clipboard.writeText(fav.text).then(() => toast('✅ Copied!')).catch(() => toast('❌ Failed.'));
-            });
-            item.querySelector('.rem').addEventListener('click', () => {
-                const upd = getFavs().filter((_,i) => i !== idx);
-                setFavs(upd); renderFavModal(); toast('💔 Removed.');
-                chatView.querySelectorAll('.fav-btn[data-txt]').forEach(b => {
-                    if (b.dataset.txt === fav.text) setStarBtn(b, false);
+
+        // --- Pinned Chats Section ---
+        if (sessFavs.length) {
+            const h = document.createElement('div');
+            h.className = 'fav-section-title'; h.innerHTML = '<i class="fa-solid fa-thumbtack"></i> Pinned Chats';
+            favList.appendChild(h);
+
+            try {
+                const data = await fetch('/api/sessions').then(r => r.json());
+                sessFavs.forEach(sid => {
+                    const s = data.sessions.find(i => i.id === sid);
+                    if (!s) return;
+                    const item = document.createElement('div'); item.className = 'fav-item session';
+                    item.innerHTML = `<div class="fav-text">${s.title}</div>
+                        <div class="fav-actions">
+                            <button class="fav-btn-sm open"><i class="fa-solid fa-arrow-right"></i> Open</button>
+                            <button class="fav-btn-sm unpin"><i class="fa-solid fa-star-half-stroke"></i> Unpin</button>
+                        </div>`;
+                    item.querySelector('.open').addEventListener('click', () => {
+                        sessionId = s.id; sessionStorage.setItem('sid', s.id);
+                        loadHistory(s.id); favModal.style.display = 'none';
+                        loadSessions();
+                    });
+                    item.querySelector('.unpin').addEventListener('click', () => {
+                        toggleSessionFav(s.id); renderFavModal(); loadSessions();
+                    });
+                    favList.appendChild(item);
                 });
+            } catch {}
+        }
+
+        // --- Saved Messages Section ---
+        if (favs.length) {
+            const h = document.createElement('div');
+            h.className = 'fav-section-title'; h.innerHTML = '<i class="fa-solid fa-message"></i> Saved Messages';
+            favList.appendChild(h);
+
+            favs.forEach((fav, idx) => {
+                const item = document.createElement('div'); item.className = 'fav-item';
+                item.innerHTML = `<div class="fav-header">
+                    <span class="fav-sender ${fav.sender}">${fav.sender==='user'?'👤 You':'⚡ Nova'}</span>
+                    <span class="fav-time">${fav.savedAt||''}</span>
+                </div><div class="fav-text"></div>
+                <div class="hist-actions" style="display:flex; margin-top:8px; gap:6px;">
+                    <button class="fav-btn-sm copy" style="background:var(--bg); border:1px solid var(--border); color:var(--tx-2); padding:4px 8px; border-radius:4px; font-size:.7rem; cursor:pointer;"><i class="fa-regular fa-copy"></i> Copy</button>
+                    <button class="fav-btn-sm rem" style="background:var(--bg); border:1px solid var(--border); color:var(--tx-2); padding:4px 8px; border-radius:4px; font-size:.7rem; cursor:pointer;"><i class="fa-solid fa-trash"></i> Remove</button>
+                </div>`;
+                item.querySelector('.fav-text').textContent = fav.text;
+                item.querySelector('.copy').addEventListener('click', () => {
+                    navigator.clipboard.writeText(fav.text).then(() => toast('✅ Copied!')).catch(() => toast('❌ Failed.'));
+                });
+                item.querySelector('.rem').addEventListener('click', () => {
+                    const upd = getFavs().filter((_,i) => i !== idx);
+                    setFavs(upd); renderFavModal(); toast('💔 Removed.');
+                    chatView.querySelectorAll('.fav-btn[data-txt]').forEach(b => {
+                        if (b.dataset.txt === fav.text) setStarBtn(b, false);
+                    });
+                });
+                favList.appendChild(item);
             });
-            favList.appendChild(item);
-        });
+        }
     }
 
     function makeFavBtn(text, sender) {

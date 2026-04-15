@@ -663,6 +663,18 @@ textarea::placeholder { color:var(--tx-3); }
 .empty-state i { font-size:2.2rem; }
 .empty-state p { font-size:.95rem; font-weight:600; color:var(--tx-2); }
 .empty-state span { font-size:.8rem; }
+.fav-section-title {
+    font-size: .65rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .8px; color: var(--tx-3); margin: 16px 0 8px;
+    display: flex; align-items: center; gap: 6px;
+}
+.fav-section-title:first-child { margin-top: 0; }
+.fav-item.session { 
+    background: var(--bg-el); border: 1px solid var(--border);
+    margin-bottom: 6px; padding: 12px 14px;
+}
+.fav-item.session .fav-text { font-weight: 600; font-size: .9rem; color: var(--tx); }
+.fav-item.session .fav-actions { margin-top: 10px; display: flex; gap: 6px; }
 
 /* ─────────────────────────────────────────
    FILE PREVIEW
