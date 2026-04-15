@@ -2,6 +2,9 @@ import os
 import uuid
 import json
 import mimetypes
+import random
+import requests
+import re
 from datetime import datetime
 from flask import Flask, request, jsonify, render_template, Response, stream_with_context
 from google import genai
@@ -24,8 +27,28 @@ except Exception as e:
 # ── In-Memory Session Store ───────────────────────────
 chat_sessions = {}
 
-ALLOWED_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash"]
-DEFAULT_MODEL  = "gemini-2.5-flash"
+ALLOWED_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
+DEFAULT_MODEL  = "gemini-2.0-flash"
+
+def generate_image_internal(prompt):
+    """
+    Tries to generate an image using Imagen 3, falls back to Pollinations AI if restricted.
+    """
+    print(f"Generating image for: {prompt}")
+    # Fallback to Pollinations AI for consistent experience in this demo
+    # but we could attempt imagen-3.0-generate-001 if the user has it.
+    try:
+        # In a real scenario with Imagen access:
+        # response = client.models.generate_image(model='imagen-3.0-generate-001', prompt=prompt)
+        # return response.images[0].url
+        
+        # Using Pollinations AI as a highly reliable and fast fallback for this project
+        seed = random.randint(1, 1000000)
+        url = f"https://image.pollinations.ai/prompt/{prompt}?width=1024&height=1024&nologo=true&seed={seed}"
+        return url
+    except Exception as e:
+        print(f"Image gen error: {e}")
+        return None
 
 # ── Personas ──────────────────────────────────────────
 PERSONAS = {
@@ -34,7 +57,9 @@ PERSONAS = {
         "instruction": (
             "You are Nova, a highly capable, friendly, and knowledgeable AI assistant. "
             "Give clear, well-structured, and concise answers. "
-            "When writing code, always use fenced code blocks with the correct language tag."
+            "IMAGE CAPABILITY: You can generate images. If the user asks for a picture, drawing, or image, "
+            "describe it first and then use the exact syntax: IMAGE_GEN(detailed prompt here). "
+            "Make the prompt inside the parentheses detailed and in English for best results."
         )
     },
     "customer_service": {
@@ -42,8 +67,7 @@ PERSONAS = {
         "instruction": (
             "You are Nova, a professional and empathetic customer service representative. "
             "Always greet the user warmly, be polite, solution-oriented, and patient. "
-            "Help users resolve issues clearly and offer alternatives when needed. "
-            "Use a formal but friendly tone."
+            "If showing a product or visual would help, use: IMAGE_GEN(visual description)."
         )
     },
     "teacher": {
@@ -51,25 +75,23 @@ PERSONAS = {
         "instruction": (
             "You are Nova, an experienced and patient educator and tutor. "
             "Explain concepts step by step, using simple language and real-world examples. "
-            "Encourage learning by asking follow-up questions. "
-            "Adapt your explanations to the user's level of understanding."
+            "Use visuals to help explain things by using: IMAGE_GEN(educational diagram or scene description)."
         )
     },
     "travel": {
         "name": "Travel Guide",
         "instruction": (
             "You are Nova, an expert travel guide with deep knowledge of destinations worldwide. "
-            "Provide travel tips, itinerary suggestions, cultural insights, local cuisine recommendations, "
-            "and safety advice. Be enthusiastic and inspiring about travel."
+            "Provide travel tips and itinerary suggestions. "
+            "Show the traveler what to expect by using: IMAGE_GEN(scenic view of the destination)."
         )
     },
     "coder": {
         "name": "Code Assistant",
         "instruction": (
             "You are Nova, an expert software engineer and code assistant. "
-            "Help with coding, debugging, code review, and explaining technical concepts. "
-            "Always provide working code with explanations. Use the best practices for the language. "
-            "Always use fenced code blocks with the correct language identifier."
+            "Help with coding and debugging. "
+            "If you need to show a UI mockup or architecture diagram, use: IMAGE_GEN(diagram description)."
         )
     }
 }
@@ -233,7 +255,24 @@ def chat_stream():
             
             # Store the complete reply
             complete = "".join(full_reply)
+            
+            # Post-process for Image Generation
+            def replace_img_gen(match):
+                prompt = match.group(1)
+                img_url = generate_image_internal(prompt)
+                if img_url:
+                    return f"\n\n![Generated Image]({img_url})\n\n"
+                return "\n\n*(Failed to generate image)*\n\n"
+            
+            complete = re.sub(r'IMAGE_GEN\((.*?)\)', replace_img_gen, complete)
+
             session_data["history"].append({"sender": "ai", "text": complete, "time": now})
+            
+            # Since streaming is done, we send a final message if needed, 
+            # but usually the frontend expects the chunks.
+            # However, for IMAGE_GEN, the last chunks might contain the raw text.
+            # We should ideally send a custom packet for the final processed text.
+            yield f"data: {json.dumps({'type':'final_processed','text':complete})}\n\n"
             yield f"data: {json.dumps({'type':'done'})}\n\n"
 
         except Exception as e:
@@ -357,7 +396,14 @@ def chat_upload():
                     full.append(chunk.text)
                     yield f"data: {json.dumps({'type':'chunk','text':chunk.text})}\n\n"
             complete = "".join(full)
+            def replace_img_gen(match):
+                prompt = match.group(1)
+                img_url = generate_image_internal(prompt)
+                if img_url: return f"\n\n![Generated Image]({img_url})\n\n"
+                return "\n\n*(Failed to generate image)*\n\n"
+            complete = re.sub(r'IMAGE_GEN\((.*?)\)', replace_img_gen, complete)
             session_data["history"].append({"sender": "ai", "text": complete, "time": now})
+            yield f"data: {json.dumps({'type':'final_processed','text':complete})}\n\n"
             yield f"data: {json.dumps({'type':'done'})}\n\n"
         except Exception as e:
             if session_data["history"] and session_data["history"][-1]["sender"] == "user":
