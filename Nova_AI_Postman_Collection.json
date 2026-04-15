@@ -1,0 +1,407 @@
+{
+	"info": {
+		"_postman_id": "nova-ai-collection-v1",
+		"name": "Nova AI – API Collection",
+		"description": "Complete API collection for Nova AI Chatbot (Flask + Google Gemini)\n\nBase URL: http://127.0.0.1:5000\n\nMake sure the server is running with: python app.py",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://127.0.0.1:5000",
+			"type": "string"
+		},
+		{
+			"key": "session_id",
+			"value": "",
+			"type": "string",
+			"description": "Auto-filled after sending the first chat message"
+		}
+	],
+	"item": [
+		{
+			"name": "🏠 Home Page",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/",
+					"host": ["{{base_url}}"],
+					"path": [""]
+				},
+				"description": "Returns the main Nova AI web UI (HTML page)"
+			},
+			"response": []
+		},
+		{
+			"name": "💬 Chat – Send Message (New Session)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"// Auto-save session_id from response",
+							"const json = pm.response.json();",
+							"if (json.session_id) {",
+							"    pm.collectionVariables.set('session_id', json.session_id);",
+							"    console.log('Session ID saved:', json.session_id);",
+							"}",
+							"",
+							"// Tests",
+							"pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+							"pm.test('Response has text', () => pm.expect(json.response).to.be.a('string').and.not.empty);",
+							"pm.test('Session ID returned', () => pm.expect(json.session_id).to.be.a('string').and.not.empty);",
+							"pm.test('Title returned', () => pm.expect(json.title).to.be.a('string'));"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"message\": \"Halo Nova! Perkenalkan dirimu secara singkat.\",\n    \"model\": \"gemini-2.5-flash\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{base_url}}/chat",
+					"host": ["{{base_url}}"],
+					"path": ["chat"]
+				},
+				"description": "Send an initial message to start a new session.\n\nThe `session_id` will be automatically saved to the collection variable and reused in subsequent requests."
+			},
+			"response": [
+				{
+					"name": "Example Response",
+					"originalRequest": {
+						"method": "POST",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"message\": \"Halo Nova!\",\n    \"model\": \"gemini-2.5-flash\"\n}"
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"body": "{\n    \"response\": \"Halo! Saya Nova, asisten AI yang siap membantu Anda...\",\n    \"session_id\": \"550e8400-e29b-41d4-a716-446655440000\",\n    \"title\": \"Halo Nova! Perkenalkan dirimu...\"\n}"
+				}
+			]
+		},
+		{
+			"name": "💬 Chat – Continue Conversation",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"const json = pm.response.json();",
+							"pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+							"pm.test('Continues same session', () => {",
+							"    pm.expect(json.session_id).to.equal(pm.collectionVariables.get('session_id'));",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"message\": \"Bisa jelaskan apa itu Python dalam 3 kalimat?\",\n    \"session_id\": \"{{session_id}}\",\n    \"model\": \"gemini-2.5-flash\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{base_url}}/chat",
+					"host": ["{{base_url}}"],
+					"path": ["chat"]
+				},
+				"description": "Continue the conversation within an existing session. The `{{session_id}}` variable is auto-populated from the first chat request."
+			},
+			"response": []
+		},
+		{
+			"name": "💬 Chat – Switch Model (gemini-2.0-flash)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"message\": \"Apa perbedaan antara list dan tuple di Python?\",\n    \"model\": \"gemini-2.0-flash\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{base_url}}/chat",
+					"host": ["{{base_url}}"],
+					"path": ["chat"]
+				},
+				"description": "Send a message using gemini-2.0-flash model. Omitting session_id creates a new session."
+			},
+			"response": []
+		},
+		{
+			"name": "💬 Chat – Error: Empty Message",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Returns 400 for empty message', () => pm.response.to.have.status(400));",
+							"pm.test('Error message present', () => {",
+							"    const json = pm.response.json();",
+							"    pm.expect(json.error).to.include('required');",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"message\": \"\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{base_url}}/chat",
+					"host": ["{{base_url}}"],
+					"path": ["chat"]
+				},
+				"description": "Tests error handling when an empty message is sent. Expects HTTP 400."
+			},
+			"response": []
+		},
+		{
+			"name": "📋 Sessions – List All",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"const json = pm.response.json();",
+							"pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+							"pm.test('Sessions array returned', () => pm.expect(json.sessions).to.be.an('array'));",
+							"console.log('Total sessions:', json.sessions.length);"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/sessions",
+					"host": ["{{base_url}}"],
+					"path": ["api", "sessions"]
+				},
+				"description": "Returns a list of all active chat sessions (id + title)."
+			},
+			"response": [
+				{
+					"name": "Example Response",
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"body": "{\n    \"sessions\": [\n        {\n            \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n            \"title\": \"Halo Nova! Perkenalkan dirimu...\",\n            \"model\": \"gemini-2.5-flash\"\n        }\n    ]\n}"
+				}
+			]
+		},
+		{
+			"name": "📖 Sessions – Get History",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"const json = pm.response.json();",
+							"pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+							"pm.test('History array present', () => pm.expect(json.history).to.be.an('array'));",
+							"pm.test('Has messages', () => pm.expect(json.history.length).to.be.above(0));"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/sessions/{{session_id}}",
+					"host": ["{{base_url}}"],
+					"path": ["api", "sessions", "{{session_id}}"]
+				},
+				"description": "Returns full message history for a specific session."
+			},
+			"response": []
+		},
+		{
+			"name": "✏️ Sessions – Rename",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"const json = pm.response.json();",
+							"pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+							"pm.test('Success flag', () => pm.expect(json.success).to.be.true);",
+							"pm.test('New title returned', () => pm.expect(json.title).to.equal('Sesi Belajar Python'));"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"title\": \"Sesi Belajar Python\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{base_url}}/api/sessions/{{session_id}}/rename",
+					"host": ["{{base_url}}"],
+					"path": ["api", "sessions", "{{session_id}}", "rename"]
+				},
+				"description": "Rename a specific chat session. Max 50 characters."
+			},
+			"response": []
+		},
+		{
+			"name": "🗑️ Sessions – Delete One",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"const json = pm.response.json();",
+							"pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+							"pm.test('Success flag', () => pm.expect(json.success).to.be.true);",
+							"",
+							"// Clear session_id variable after deletion",
+							"pm.collectionVariables.set('session_id', '');"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/sessions/{{session_id}}",
+					"host": ["{{base_url}}"],
+					"path": ["api", "sessions", "{{session_id}}"]
+				},
+				"description": "⚠️ Permanently deletes a specific chat session and all its history.\n\nThis will also clear the `session_id` collection variable."
+			},
+			"response": []
+		},
+		{
+			"name": "💥 Sessions – Clear ALL",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"const json = pm.response.json();",
+							"pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+							"pm.test('Success flag', () => pm.expect(json.success).to.be.true);",
+							"pm.collectionVariables.set('session_id', '');"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/sessions/clear",
+					"host": ["{{base_url}}"],
+					"path": ["api", "sessions", "clear"]
+				},
+				"description": "⚠️ DANGER: Permanently deletes ALL chat sessions from memory. Cannot be undone."
+			},
+			"response": []
+		},
+		{
+			"name": "❌ Sessions – Get Non-Existent",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Returns 404 for unknown session', () => pm.response.to.have.status(404));",
+							"const json = pm.response.json();",
+							"pm.test('Error message present', () => pm.expect(json.error).to.be.a('string'));"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/sessions/invalid-session-id-00000",
+					"host": ["{{base_url}}"],
+					"path": ["api", "sessions", "invalid-session-id-00000"]
+				},
+				"description": "Tests error handling for a session that doesn't exist. Expects HTTP 404."
+			},
+			"response": []
+		}
+	]
+}
