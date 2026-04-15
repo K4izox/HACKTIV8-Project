@@ -55,13 +55,17 @@
 
 ## 📸 Screenshots
 
+> *Main Interface — Premium Dark Mode*
+
+![Nova AI Main View](static/screenshots/main_view.png)
+
 > *Unified Favorites Modal — Managing pinned chats and saved messages*
 
-![Nova AI Favorites](https://via.placeholder.com/900x500/0f0f12/7c5cfc?text=Nova+AI+Unified+Favorites)
+![Nova AI Favorites](static/screenshots/favorites_modal.png)
 
 > *Contextual Settings — Adjusting Response Style and Language*
 
-![Nova AI Settings](https://via.placeholder.com/900x500/0f0f12/4facfe?text=Nova+AI+Settings+Panel)
+![Nova AI Settings](static/screenshots/settings_panel.png)
 
 ---
 
