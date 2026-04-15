@@ -45,8 +45,11 @@ def generate_image_internal(prompt):
         
         # Using Pollinations AI as a highly reliable and fast fallback for this project
         seed = random.randint(1, 1000000)
-        encoded_prompt = urllib.parse.quote(prompt.strip())
+        # Clean up prompt: remove newlines and extra spaces
+        clean_prompt = re.sub(r'\s+', ' ', prompt).strip()
+        encoded_prompt = urllib.parse.quote(clean_prompt)
         url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true&seed={seed}"
+        print(f"Generated URL: {url}")
         return url
     except Exception as e:
         print(f"Image gen error: {e}")
@@ -216,7 +219,6 @@ def chat_stream():
         session_data["title"] = (message[:30] + "...") if len(message) > 30 else message
 
     session_data["history"].append({"sender": "user", "text": message, "time": now})
-
 
     # We need to collect the full reply to store in history.
     # Use a wrapper that intercepts chunks.
