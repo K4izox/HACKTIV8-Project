@@ -1,10 +1,11 @@
 /* =====================================================
-   Nova AI – Main JavaScript  (fully functional)
+   Nova AI – Main JavaScript (Full Feature Build)
+   Features: Streaming, Persona, Voice Input, Temperature
    ===================================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
 
-    /* ── DOM Refs ─────────────────────────────────── */
+    /* ── DOM Refs ──────────────────────────────────── */
     const messageInput     = document.getElementById('message-input');
     const sendBtn          = document.getElementById('send-btn');
     const chatWindow       = document.getElementById('chat-window');
@@ -34,28 +35,37 @@ document.addEventListener('DOMContentLoaded', () => {
     const renameConfirm    = document.getElementById('rename-confirm');
     const renameCancel     = document.getElementById('rename-cancel');
     const copySessionBtn   = document.getElementById('copy-session-btn');
+    const tempSlider       = document.getElementById('temp-slider');
+    const tempValue        = document.getElementById('temp-value');
+    const voiceBtn         = document.getElementById('voice-btn');
+    const personaGrid      = document.getElementById('persona-grid');
 
-    /* ── State ────────────────────────────────────── */
-    let sessionId            = sessionStorage.getItem('chat_session_id') || null;
-    let isWaiting            = false;
-    let currentModel         = localStorage.getItem('nova-model') || 'gemini-2.5-flash';
-    let renameTargetId       = null;
-    let searchActive         = false;
-    let welcomeDetached      = false; // tracks whether welcome was removed from DOM
+    /* ── State ─────────────────────────────────────── */
+    let sessionId       = sessionStorage.getItem('chat_session_id') || null;
+    let isWaiting       = false;
+    let currentModel    = localStorage.getItem('nova-model')       || 'gemini-2.5-flash';
+    let currentPersona  = localStorage.getItem('nova-persona')     || 'assistant';
+    let currentTemp     = parseFloat(localStorage.getItem('nova-temperature') || '0.7');
+    let renameTargetId  = null;
+    let searchActive    = false;
+    let isRecording     = false;
+    let recognition     = null;
 
-    /* ── Init ─────────────────────────────────────── */
+    /* ── Init ──────────────────────────────────────── */
     sendBtn.disabled = true;
     applyModelUI(currentModel);
+    applyPersonaUI(currentPersona);
+    tempSlider.value = currentTemp;
+    tempValue.textContent = currentTemp.toFixed(1);
 
-    if (sessionId) {
-        loadSessionHistory(sessionId);   // will detach welcome screen
-    }
+    if (sessionId) loadSessionHistory(sessionId);
     loadSessions();
+    initVoice();
 
     /* ═══════════════════════════════════════════════
        TOAST
     ════════════════════════════════════════════════ */
-    function showToast(msg, ms = 2400) {
+    function showToast(msg, ms = 2500) {
         const t = document.getElementById('toast');
         t.textContent = msg;
         t.classList.add('show');
@@ -85,7 +95,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window.innerWidth <= 768) sidebar.classList.toggle('mobile-open');
         else                          sidebar.classList.toggle('collapsed');
     });
-    // Close mobile sidebar on outside click
     document.addEventListener('click', (e) => {
         if (window.innerWidth <= 768 &&
             sidebar.classList.contains('mobile-open') &&
@@ -107,12 +116,11 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.model-option').forEach(opt => {
         opt.addEventListener('click', (e) => {
             e.stopPropagation();
-            const model = opt.dataset.model;
-            currentModel = model;
-            localStorage.setItem('nova-model', model);
-            applyModelUI(model);
+            currentModel = opt.dataset.model;
+            localStorage.setItem('nova-model', currentModel);
+            applyModelUI(currentModel);
             modelDropdown.classList.remove('open');
-            showToast(`⚡ Switched to ${model}`);
+            showToast(`⚡ Switched to ${currentModel}`);
         });
     });
 
@@ -121,6 +129,92 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.model-option').forEach(o => {
             o.classList.toggle('active', o.dataset.model === model);
         });
+    }
+
+    /* ═══════════════════════════════════════════════
+       PERSONA SELECTOR
+    ════════════════════════════════════════════════ */
+    personaGrid.querySelectorAll('.persona-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            currentPersona = chip.dataset.persona;
+            localStorage.setItem('nova-persona', currentPersona);
+            applyPersonaUI(currentPersona);
+            showToast(`🎭 Persona: ${chip.querySelector('span').textContent}`);
+        });
+    });
+
+    function applyPersonaUI(persona) {
+        personaGrid.querySelectorAll('.persona-chip').forEach(c => {
+            c.classList.toggle('active', c.dataset.persona === persona);
+        });
+    }
+
+    /* ═══════════════════════════════════════════════
+       TEMPERATURE SLIDER
+    ════════════════════════════════════════════════ */
+    tempSlider.addEventListener('input', () => {
+        currentTemp = parseFloat(tempSlider.value);
+        tempValue.textContent = currentTemp.toFixed(1);
+        localStorage.setItem('nova-temperature', currentTemp);
+    });
+
+    /* ═══════════════════════════════════════════════
+       VOICE INPUT (Web Speech API)
+    ════════════════════════════════════════════════ */
+    function initVoice() {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            voiceBtn.title = 'Voice input not supported in this browser';
+            voiceBtn.style.opacity = '0.4';
+            voiceBtn.style.cursor = 'not-allowed';
+            return;
+        }
+
+        recognition = new SpeechRecognition();
+        recognition.lang = 'id-ID';   // Default Indonesian; auto-detects
+        recognition.continuous = false;
+        recognition.interimResults = true;
+
+        let interimTranscript = '';
+
+        recognition.onstart = () => {
+            isRecording = true;
+            voiceBtn.classList.add('recording');
+            voiceBtn.title = 'Listening… click to stop';
+            showToast('🎙️ Listening…');
+        };
+
+        recognition.onresult = (event) => {
+            let final = '';
+            interimTranscript = '';
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                if (event.results[i].isFinal) final += event.results[i][0].transcript;
+                else interimTranscript += event.results[i][0].transcript;
+            }
+            if (final) {
+                messageInput.value = (messageInput.value + ' ' + final).trim();
+                messageInput.dispatchEvent(new Event('input'));
+            }
+        };
+
+        recognition.onerror = (e) => {
+            console.error('Voice error:', e.error);
+            showToast('❌ Voice error: ' + e.error);
+            stopRecording();
+        };
+
+        recognition.onend = () => stopRecording();
+
+        voiceBtn.addEventListener('click', () => {
+            if (isRecording) recognition.stop();
+            else              recognition.start();
+        });
+    }
+
+    function stopRecording() {
+        isRecording = false;
+        voiceBtn.classList.remove('recording');
+        voiceBtn.title = 'Voice input';
     }
 
     /* ═══════════════════════════════════════════════
@@ -147,13 +241,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function startNewChat() {
         sessionStorage.removeItem('chat_session_id');
         sessionId = null;
-        welcomeDetached = false;
-
-        // Clear all messages and re-attach welcome screen
         chatWindow.innerHTML = '';
         chatWindow.appendChild(welcomeScreen);
-        welcomeScreen.style.display = 'flex'; // welcome uses flexbox centering
-
+        welcomeScreen.style.display = 'flex';
         messageInput.value = '';
         messageInput.style.height = 'auto';
         charCount.textContent = '0';
@@ -164,7 +254,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /* ═══════════════════════════════════════════════
-       SCROLL TO BOTTOM
+       SCROLL
     ════════════════════════════════════════════════ */
     chatWindow.addEventListener('scroll', () => {
         const near = chatWindow.scrollHeight - chatWindow.scrollTop - chatWindow.clientHeight < 120;
@@ -218,7 +308,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /* ═══════════════════════════════════════════════
-       EXPORT CHAT
+       EXPORT
     ════════════════════════════════════════════════ */
     exportBtn.addEventListener('click', () => {
         const msgs = chatWindow.querySelectorAll('.message-container');
@@ -229,7 +319,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const text = (c.querySelector('.message-bubble')?.innerText || '').trim();
             out += `${who}:\n${text}\n\n`;
         });
-        const a   = Object.assign(document.createElement('a'), {
+        const a = Object.assign(document.createElement('a'), {
             href:     URL.createObjectURL(new Blob([out], { type: 'text/plain' })),
             download: `nova-chat-${new Date().toISOString().slice(0,10)}.txt`,
         });
@@ -248,9 +338,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .catch(() => showToast('❌ Error clearing chats.'));
     });
 
-    /* ═══════════════════════════════════════════════
-       COPY SESSION LINK
-    ════════════════════════════════════════════════ */
+    /* COPY SESSION */
     copySessionBtn.addEventListener('click', () => {
         const link = window.location.origin + '/?session=' + (sessionId || '');
         navigator.clipboard.writeText(link)
@@ -258,9 +346,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .catch(()  => showToast('❌ Could not copy link.'));
     });
 
-    /* ═══════════════════════════════════════════════
-       ATTACH FILE (placeholder)
-    ════════════════════════════════════════════════ */
+    /* ATTACH (placeholder) */
     attachBtn.addEventListener('click', () => showToast('📎 File upload coming soon!'));
 
     /* ═══════════════════════════════════════════════
@@ -286,8 +372,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!title || !renameTargetId) return;
         try {
             const r = await fetch(`/api/sessions/${renameTargetId}/rename`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ title }),
             });
             if (!r.ok) throw new Error();
@@ -297,11 +382,11 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch { showToast('❌ Rename failed.'); }
     });
     renameInput.addEventListener('keydown', e => { if (e.key === 'Enter') renameConfirm.click(); });
-    renameCancel.addEventListener('click', () => renameModal.style.display = 'none');
-    renameModal.addEventListener('click', (e) => { if (e.target === renameModal) renameModal.style.display = 'none'; });
+    renameCancel.addEventListener('click',  () => renameModal.style.display = 'none');
+    renameModal.addEventListener('click',   (e) => { if (e.target === renameModal) renameModal.style.display = 'none'; });
 
     /* ═══════════════════════════════════════════════
-       LOAD SESSION LIST (Sidebar)
+       LOAD SESSION LIST
     ════════════════════════════════════════════════ */
     async function loadSessions() {
         try {
@@ -309,7 +394,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await r.json();
             chatHistoryList.innerHTML = '';
 
-            if (!data.sessions || !data.sessions.length) {
+            if (!data.sessions?.length) {
                 chatHistoryList.innerHTML = '<div style="color:var(--text-muted);font-size:.8rem;padding:8px 6px;">No chats yet.</div>';
                 return;
             }
@@ -317,7 +402,6 @@ document.addEventListener('DOMContentLoaded', () => {
             data.sessions.forEach(s => {
                 const div = document.createElement('div');
                 div.className = `history-item ${s.id === sessionId ? 'active' : ''}`;
-                // safe text insertion
                 div.innerHTML = `
                     <i class="fa-regular fa-message"></i>
                     <span></span>
@@ -329,7 +413,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 div.querySelector('span').textContent = s.title;
                 div.querySelector('span').title       = s.title;
 
-                // click = load
                 div.addEventListener('click', async (e) => {
                     if (e.target.closest('.history-actions')) return;
                     sessionId = s.id;
@@ -340,7 +423,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (window.innerWidth <= 768) sidebar.classList.remove('mobile-open');
                 });
 
-                // rename
                 div.querySelector('.rename').addEventListener('click', (e) => {
                     e.stopPropagation();
                     renameTargetId    = s.id;
@@ -349,7 +431,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     setTimeout(() => renameInput.focus(), 50);
                 });
 
-                // delete
                 div.querySelector('.delete').addEventListener('click', async (e) => {
                     e.stopPropagation();
                     if (!confirm(`Delete "${s.title}"?`)) return;
@@ -358,54 +439,45 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (!r.ok) throw new Error();
                         showToast('🗑️  Chat deleted.');
                         if (s.id === sessionId) startNewChat();
-                        else loadSessions();
+                        else                    loadSessions();
                     } catch { showToast('❌ Delete failed.'); }
                 });
 
                 chatHistoryList.appendChild(div);
             });
-        } catch (err) {
-            console.error('loadSessions error:', err);
-        }
+        } catch (err) { console.error('loadSessions error:', err); }
     }
 
     /* ═══════════════════════════════════════════════
-       LOAD HISTORY FOR A SPECIFIC SESSION
+       LOAD SESSION HISTORY
     ════════════════════════════════════════════════ */
     async function loadSessionHistory(id) {
         try {
             const r = await fetch(`/api/sessions/${id}`);
             if (!r.ok) { startNewChat(); return; }
             const data = await r.json();
-
-            // detach welcome screen; clear messages
             if (welcomeScreen.parentNode) welcomeScreen.remove();
-            welcomeDetached = true;
             chatWindow.innerHTML = '';
-
             data.history.forEach(m => appendMessage(m.sender, m.text, m.time));
-
-            // restore model used in this session
-            if (data.model) applyModelUI(data.model);
-
+            if (data.model)    applyModelUI(data.model);
+            if (data.persona)  applyPersonaUI(data.persona);
+            if (data.temperature != null) {
+                currentTemp = data.temperature;
+                tempSlider.value = currentTemp;
+                tempValue.textContent = parseFloat(currentTemp).toFixed(1);
+            }
             scrollToBottom();
-        } catch (err) {
-            console.error('loadSessionHistory error:', err);
-        }
+        } catch (err) { console.error('loadSessionHistory error:', err); }
     }
 
     /* ═══════════════════════════════════════════════
-       SEND MESSAGE
+       SEND MESSAGE  (with SSE Streaming)
     ════════════════════════════════════════════════ */
     async function sendMessage() {
         const message = messageInput.value.trim();
         if (!message || isWaiting) return;
 
-        // Remove welcome screen on first send
-        if (welcomeScreen.parentNode === chatWindow) {
-            welcomeScreen.remove();
-            welcomeDetached = true;
-        }
+        if (welcomeScreen.parentNode === chatWindow) welcomeScreen.remove();
 
         appendMessage('user', message);
         messageInput.value = '';
@@ -413,43 +485,152 @@ document.addEventListener('DOMContentLoaded', () => {
         charCount.textContent = '0';
         sendBtn.disabled = true;
         isWaiting = true;
-
-        const typingId = showTyping();
         scrollToBottom();
 
+        // Create AI bubble for streaming
+        const aiBubble = createStreamingBubble();
+        scrollToBottom();
+
+        const payload = {
+            message,
+            session_id:  sessionId,
+            model:       currentModel,
+            persona:     currentPersona,
+            temperature: currentTemp,
+        };
+
         try {
-            const resp = await fetch('/chat', {
+            const resp = await fetch('/chat/stream', {
                 method:  'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify({ message, session_id: sessionId, model: currentModel }),
+                body:    JSON.stringify(payload),
             });
-            const data = await resp.json();
-            removeEl(typingId);
 
-            if (resp.ok) {
-                const isNewSession = sessionId !== data.session_id;
-                sessionId = data.session_id;
-                sessionStorage.setItem('chat_session_id', sessionId);
-                appendMessage('ai', data.response);
-                if (isNewSession) loadSessions(); // new item appears in sidebar
-                else              loadSessions(); // update title if changed
-            } else {
-                appendMessage('ai', `**Error:** ${data.error || 'Something went wrong. Please try again.'}`);
+            if (!resp.ok || !resp.body) {
+                throw new Error('Stream failed: ' + resp.status);
             }
+
+            const reader  = resp.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer    = '';
+            let fullText  = '';
+            let cursor    = aiBubble.querySelector('.stream-cursor');
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop(); // keep incomplete line
+
+                for (const line of lines) {
+                    if (!line.startsWith('data: ')) continue;
+                    try {
+                        const evt = JSON.parse(line.slice(6));
+                        if (evt.type === 'session') {
+                            sessionId = evt.session_id;
+                            sessionStorage.setItem('chat_session_id', sessionId);
+                        } else if (evt.type === 'chunk') {
+                            fullText += evt.text;
+                            // Render markdown incrementally
+                            const rendered = typeof marked !== 'undefined'
+                                ? marked.parse(fullText)
+                                : fullText.replace(/\n/g, '<br>');
+                            aiBubble.innerHTML = rendered;
+                            // Re-add cursor
+                            const cur = document.createElement('span');
+                            cur.className = 'stream-cursor';
+                            aiBubble.appendChild(cur);
+                            scrollToBottom();
+                        } else if (evt.type === 'done') {
+                            // Final render without cursor
+                            if (typeof marked !== 'undefined') {
+                                aiBubble.innerHTML = marked.parse(fullText);
+                            }
+                            aiBubble.querySelectorAll('pre').forEach(addCopyCodeBtn);
+                            loadSessions();
+                            scrollToBottom();
+                        } else if (evt.type === 'error') {
+                            aiBubble.textContent = '❌ Error: ' + evt.message;
+                        }
+                    } catch (parseErr) { /* ignore malformed SSE line */ }
+                }
+            }
+
+            // Finalize message container with meta buttons
+            finalizeStreamedMessage(aiBubble.closest('.message-container'), fullText);
+
         } catch (err) {
-            removeEl(typingId);
-            appendMessage('ai', '**Error:** Cannot reach the server. Make sure `app.py` is running.');
-            console.error('sendMessage error:', err);
+            console.error('Stream error:', err);
+            aiBubble.textContent = '❌ Error: Cannot reach server.';
         } finally {
             isWaiting = false;
             sendBtn.disabled = messageInput.value.trim() === '';
             messageInput.focus();
-            scrollToBottom();
         }
     }
 
+    /* ── Create a streaming AI bubble (before text arrives) ─ */
+    function createStreamingBubble() {
+        const container = document.createElement('div');
+        container.className = 'message-container ai';
+
+        const row = document.createElement('div');
+        row.className = 'message-row';
+
+        const avatar = document.createElement('div');
+        avatar.className = 'message-avatar';
+        avatar.innerHTML = '<i class="fa-solid fa-bolt"></i>';
+
+        const content = document.createElement('div');
+        content.className = 'message-content';
+
+        const bubble = document.createElement('div');
+        bubble.className = 'message-bubble';
+
+        const cursor = document.createElement('span');
+        cursor.className = 'stream-cursor';
+        bubble.appendChild(cursor);
+
+        content.appendChild(bubble);
+        row.appendChild(avatar);
+        row.appendChild(content);
+        container.appendChild(row);
+        chatWindow.appendChild(container);
+
+        return bubble;
+    }
+
+    /* ── Add meta buttons after streaming completes ────────── */
+    function finalizeStreamedMessage(container, text) {
+        const content = container.querySelector('.message-content');
+        // Remove old meta if present
+        content.querySelector('.message-meta')?.remove();
+
+        const meta = document.createElement('div');
+        meta.className = 'message-meta';
+        const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'meta-time';
+        timeSpan.textContent = time;
+        meta.appendChild(timeSpan);
+
+        const copyBtn = makeMetaBtn('<i class="fa-regular fa-copy"></i> Copy', () => {
+            const bubble = container.querySelector('.message-bubble');
+            navigator.clipboard.writeText(bubble.innerText)
+                .then(()  => showToast('✅ Copied!'))
+                .catch(()  => showToast('❌ Copy failed.'));
+        });
+        meta.appendChild(copyBtn);
+
+        const retryBtn = makeMetaBtn('<i class="fa-solid fa-rotate-right"></i> Retry', () => retryMessage(container));
+        meta.appendChild(retryBtn);
+
+        content.appendChild(meta);
+    }
+
     /* ═══════════════════════════════════════════════
-       APPEND MESSAGE
+       APPEND MESSAGE (for history load)
     ════════════════════════════════════════════════ */
     function appendMessage(sender, text, timeStr) {
         const time = timeStr || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -460,31 +641,26 @@ document.addEventListener('DOMContentLoaded', () => {
         const row = document.createElement('div');
         row.className = 'message-row';
 
-        // Avatar
         const avatar = document.createElement('div');
         avatar.className = 'message-avatar';
         avatar.innerHTML = sender === 'user'
             ? '<i class="fa-solid fa-user"></i>'
             : '<i class="fa-solid fa-bolt"></i>';
 
-        // Content wrapper
         const content = document.createElement('div');
         content.className = 'message-content';
 
-        // Bubble
         const bubble = document.createElement('div');
         bubble.className = 'message-bubble';
 
         if (sender === 'ai' && typeof marked !== 'undefined') {
             bubble.innerHTML = marked.parse(text);
-            // Add copy button to every code block
             bubble.querySelectorAll('pre').forEach(addCopyCodeBtn);
         } else {
             bubble.innerText = text;
         }
         content.appendChild(bubble);
 
-        // Meta row (time + action buttons)
         const meta = document.createElement('div');
         meta.className = 'message-meta';
 
@@ -493,7 +669,6 @@ document.addEventListener('DOMContentLoaded', () => {
         timeSpan.textContent = time;
         meta.appendChild(timeSpan);
 
-        // Copy message button
         const copyBtn = makeMetaBtn('<i class="fa-regular fa-copy"></i> Copy', () => {
             navigator.clipboard.writeText(bubble.innerText)
                 .then(()  => showToast('✅ Copied!'))
@@ -501,46 +676,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         meta.appendChild(copyBtn);
 
-        // Retry button (AI only)
         if (sender === 'ai') {
-            const retryBtn = makeMetaBtn('<i class="fa-solid fa-rotate-right"></i> Retry', async () => {
-                // Find the preceding user message
-                const siblings = [...chatWindow.querySelectorAll('.message-container')];
-                const idx      = siblings.indexOf(container);
-                let userText   = null;
-                for (let i = idx - 1; i >= 0; i--) {
-                    if (siblings[i].classList.contains('user')) {
-                        userText = siblings[i].querySelector('.message-bubble')?.innerText || null;
-                        break;
-                    }
-                }
-                if (!userText) { showToast('⚠️ No user message to retry.'); return; }
-
-                container.remove();
-                isWaiting = true;
-                sendBtn.disabled = true;
-                const tid = showTyping();
-                scrollToBottom();
-
-                try {
-                    const r    = await fetch('/chat', {
-                        method:  'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body:    JSON.stringify({ message: userText, session_id: sessionId, model: currentModel }),
-                    });
-                    const d = await r.json();
-                    removeEl(tid);
-                    if (r.ok) appendMessage('ai', d.response);
-                    else      appendMessage('ai', `**Error:** ${d.error}`);
-                } catch {
-                    removeEl(tid);
-                    appendMessage('ai', '**Error:** Server unreachable.');
-                } finally {
-                    isWaiting = false;
-                    sendBtn.disabled = messageInput.value.trim() === '';
-                    scrollToBottom();
-                }
-            });
+            const retryBtn = makeMetaBtn('<i class="fa-solid fa-rotate-right"></i> Retry',
+                () => retryMessage(container));
             meta.appendChild(retryBtn);
         }
 
@@ -552,6 +690,75 @@ document.addEventListener('DOMContentLoaded', () => {
         return container;
     }
 
+    /* ═══════════════════════════════════════════════
+       RETRY
+    ════════════════════════════════════════════════ */
+    async function retryMessage(aiContainer) {
+        const siblings = [...chatWindow.querySelectorAll('.message-container')];
+        const idx = siblings.indexOf(aiContainer);
+        let userText = null;
+        for (let i = idx - 1; i >= 0; i--) {
+            if (siblings[i].classList.contains('user')) {
+                userText = siblings[i].querySelector('.message-bubble')?.innerText || null;
+                break;
+            }
+        }
+        if (!userText) { showToast('⚠️ No user message to retry.'); return; }
+
+        aiContainer.remove();
+        isWaiting = true;
+        sendBtn.disabled = true;
+
+        const aiBubble = createStreamingBubble();
+        scrollToBottom();
+
+        try {
+            const resp = await fetch('/chat/stream', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: userText, session_id: sessionId, model: currentModel, persona: currentPersona, temperature: currentTemp }),
+            });
+            const reader  = resp.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '', fullText = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+                for (const line of lines) {
+                    if (!line.startsWith('data: ')) continue;
+                    try {
+                        const evt = JSON.parse(line.slice(6));
+                        if (evt.type === 'chunk') {
+                            fullText += evt.text;
+                            aiBubble.innerHTML = (typeof marked !== 'undefined') ? marked.parse(fullText) : fullText;
+                            const cur = document.createElement('span');
+                            cur.className = 'stream-cursor';
+                            aiBubble.appendChild(cur);
+                            scrollToBottom();
+                        } else if (evt.type === 'done') {
+                            if (typeof marked !== 'undefined') aiBubble.innerHTML = marked.parse(fullText);
+                            aiBubble.querySelectorAll('pre').forEach(addCopyCodeBtn);
+                            finalizeStreamedMessage(aiBubble.closest('.message-container'), fullText);
+                        }
+                    } catch {}
+                }
+            }
+        } catch (err) {
+            aiBubble.textContent = '❌ Error: ' + err.message;
+        } finally {
+            isWaiting = false;
+            sendBtn.disabled = messageInput.value.trim() === '';
+            scrollToBottom();
+        }
+    }
+
+    /* ═══════════════════════════════════════════════
+       HELPERS
+    ════════════════════════════════════════════════ */
     function makeMetaBtn(html, onClick) {
         const btn = document.createElement('button');
         btn.className = 'meta-btn';
@@ -561,12 +768,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function addCopyCodeBtn(pre) {
-        // wrap
         const wrap = document.createElement('div');
         wrap.className = 'code-block-wrapper';
         pre.parentNode.insertBefore(wrap, pre);
         wrap.appendChild(pre);
-
         const btn = document.createElement('button');
         btn.className = 'copy-code-btn';
         btn.innerHTML = '<i class="fa-regular fa-copy"></i> Copy';
@@ -580,41 +785,11 @@ document.addEventListener('DOMContentLoaded', () => {
         wrap.appendChild(btn);
     }
 
-    /* ═══════════════════════════════════════════════
-       TYPING INDICATOR
-    ════════════════════════════════════════════════ */
-    function showTyping() {
-        const id = 'typing-' + Date.now();
-        const el = document.createElement('div');
-        el.className = 'message-container ai';
-        el.id = id;
-        el.innerHTML = `
-            <div class="message-row">
-                <div class="message-avatar"><i class="fa-solid fa-bolt"></i></div>
-                <div class="message-content">
-                    <div class="message-bubble" style="padding:12px 18px;">
-                        <div class="typing-indicator">
-                            <div class="typing-dot"></div>
-                            <div class="typing-dot"></div>
-                            <div class="typing-dot"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-        chatWindow.appendChild(el);
-        return id;
-    }
-
-    /* ═══════════════════════════════════════════════
-       HELPERS
-    ════════════════════════════════════════════════ */
-    function removeEl(id) { document.getElementById(id)?.remove(); }
     function scrollToBottom() {
         chatWindow.scrollTo({ top: chatWindow.scrollHeight, behavior: 'smooth' });
     }
 
-    /* ── Global for inline onclick in HTML ────────── */
+    /* Global for inline onclick */
     window.submitSuggested = (txt) => {
         messageInput.value = txt;
         messageInput.dispatchEvent(new Event('input'));

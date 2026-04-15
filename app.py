@@ -1,7 +1,8 @@
 import os
 import uuid
+import json
 from datetime import datetime
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, Response, stream_with_context
 from google import genai
 from dotenv import load_dotenv
 
@@ -10,7 +11,7 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
-# ── Gemini Client ────────────────────────────────────────
+# ── Gemini Client ─────────────────────────────────────
 api_key = os.getenv("GEMINI_API_KEY")
 try:
     client = genai.Client(api_key=api_key)
@@ -18,77 +19,130 @@ except Exception as e:
     client = None
     print(f"Warning: Failed to initialize Gemini Client: {e}")
 
-# ── In-Memory Session Store ──────────────────────────────
-# { session_id: { "chat": <obj>, "title": str, "history": [], "model": str } }
+# ── In-Memory Session Store ───────────────────────────
 chat_sessions = {}
 
 ALLOWED_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash"]
 DEFAULT_MODEL  = "gemini-2.5-flash"
-SYSTEM_PROMPT  = (
-    "You are Nova, a highly capable, friendly, and knowledgeable AI assistant. "
-    "You give clear, well-structured, and concise answers. "
-    "When writing code, always use fenced code blocks with the correct language tag."
-)
 
-# ── Pages ────────────────────────────────────────────────
+# ── Personas ──────────────────────────────────────────
+PERSONAS = {
+    "assistant": {
+        "name": "General Assistant",
+        "instruction": (
+            "You are Nova, a highly capable, friendly, and knowledgeable AI assistant. "
+            "Give clear, well-structured, and concise answers. "
+            "When writing code, always use fenced code blocks with the correct language tag."
+        )
+    },
+    "customer_service": {
+        "name": "Customer Service",
+        "instruction": (
+            "You are Nova, a professional and empathetic customer service representative. "
+            "Always greet the user warmly, be polite, solution-oriented, and patient. "
+            "Help users resolve issues clearly and offer alternatives when needed. "
+            "Use a formal but friendly tone."
+        )
+    },
+    "teacher": {
+        "name": "Teacher / Tutor",
+        "instruction": (
+            "You are Nova, an experienced and patient educator and tutor. "
+            "Explain concepts step by step, using simple language and real-world examples. "
+            "Encourage learning by asking follow-up questions. "
+            "Adapt your explanations to the user's level of understanding."
+        )
+    },
+    "travel": {
+        "name": "Travel Guide",
+        "instruction": (
+            "You are Nova, an expert travel guide with deep knowledge of destinations worldwide. "
+            "Provide travel tips, itinerary suggestions, cultural insights, local cuisine recommendations, "
+            "and safety advice. Be enthusiastic and inspiring about travel."
+        )
+    },
+    "coder": {
+        "name": "Code Assistant",
+        "instruction": (
+            "You are Nova, an expert software engineer and code assistant. "
+            "Help with coding, debugging, code review, and explaining technical concepts. "
+            "Always provide working code with explanations. Use the best practices for the language. "
+            "Always use fenced code blocks with the correct language identifier."
+        )
+    }
+}
+
+# ── Pages ─────────────────────────────────────────────
 @app.route("/")
 def index():
     return render_template("index.html")
 
-# ── Chat ─────────────────────────────────────────────────
+# ── Helper: create session ────────────────────────────
+def _create_session(model, persona, temperature, old_history=None):
+    sid    = str(uuid.uuid4())
+    p_data = PERSONAS.get(persona, PERSONAS["assistant"])
+    config = {
+        "system_instruction": p_data["instruction"],
+        "temperature": float(temperature),
+    }
+    chat_sessions[sid] = {
+        "chat":        client.chats.create(model=model, config=config),
+        "title":       "New Chat",
+        "history":     old_history or [],
+        "model":       model,
+        "persona":     persona,
+        "temperature": float(temperature),
+    }
+    return sid
+
+def _needs_new_session(session_id, model, persona, temperature):
+    existing = chat_sessions.get(session_id) if session_id else None
+    if existing is None:
+        return True
+    if existing.get("model") != model:
+        return True
+    if existing.get("persona") != persona:
+        return True
+    return False
+
+# ── Chat (Standard) ───────────────────────────────────
 @app.route("/chat", methods=["POST"])
 def chat():
     if not client:
-        return jsonify({"error": "Gemini Client not initialized. Check your GEMINI_API_KEY in .env"}), 500
+        return jsonify({"error": "Gemini Client not initialized. Check GEMINI_API_KEY in .env"}), 500
 
-    data       = request.json or {}
-    message    = data.get("message", "").strip()
-    session_id = data.get("session_id", "")
-    model      = data.get("model", DEFAULT_MODEL)
+    data        = request.json or {}
+    message     = data.get("message", "").strip()
+    session_id  = data.get("session_id", "")
+    model       = data.get("model", DEFAULT_MODEL)
+    persona     = data.get("persona", "assistant")
+    temperature = float(data.get("temperature", 0.7))
 
     if model not in ALLOWED_MODELS:
         model = DEFAULT_MODEL
     if not message:
         return jsonify({"error": "Message is required"}), 400
 
-    # Determine if we need a fresh Gemini chat object
-    existing = chat_sessions.get(session_id) if session_id else None
-    needs_new = (
-        existing is None or
-        existing.get("model") != model
-    )
-
-    if needs_new:
-        old_history = existing.get("history", []) if existing else []
-        session_id  = str(uuid.uuid4())
-        config      = {"system_instruction": SYSTEM_PROMPT}
-        chat_sessions[session_id] = {
-            "chat":    client.chats.create(model=model, config=config),
-            "title":   "New Chat",
-            "history": old_history,
-            "model":   model,
-        }
+    if _needs_new_session(session_id, model, persona, temperature):
+        old_history = chat_sessions.get(session_id, {}).get("history", []) if session_id else []
+        session_id  = _create_session(model, persona, temperature, old_history)
 
     session_data = chat_sessions[session_id]
     now = datetime.now().strftime("%H:%M")
 
-    # Auto-title on first user message
     if not any(h["sender"] == "user" for h in session_data["history"]):
         session_data["title"] = (message[:30] + "...") if len(message) > 30 else message
 
-    # Append user message to history
     session_data["history"].append({"sender": "user", "text": message, "time": now})
 
     try:
         response = session_data["chat"].send_message(message)
         reply    = response.text
     except Exception as e:
-        print(f"Gemini error: {e}")
-        # Remove the user message we just added since the call failed
         session_data["history"].pop()
+        print(f"Gemini error: {e}")
         return jsonify({"error": str(e)}), 500
 
-    # Append AI reply to history
     session_data["history"].append({"sender": "ai", "text": reply, "time": now})
 
     return jsonify({
@@ -97,30 +151,122 @@ def chat():
         "title":      session_data["title"],
     })
 
-# ── Sessions: Clear ALL (must be defined before /<session_id>) ──
+# ── Chat (Streaming SSE) ──────────────────────────────
+@app.route("/chat/stream", methods=["POST"])
+def chat_stream():
+    if not client:
+        def err():
+            yield f"data: {json.dumps({'type':'error','message':'Gemini Client not initialized'})}\n\n"
+        return Response(err(), mimetype="text/event-stream")
+
+    data        = request.json or {}
+    message     = data.get("message", "").strip()
+    session_id  = data.get("session_id", "")
+    model       = data.get("model", DEFAULT_MODEL)
+    persona     = data.get("persona", "assistant")
+    temperature = float(data.get("temperature", 0.7))
+
+    if model not in ALLOWED_MODELS:
+        model = DEFAULT_MODEL
+
+    if not message:
+        def err():
+            yield f"data: {json.dumps({'type':'error','message':'Message required'})}\n\n"
+        return Response(err(), mimetype="text/event-stream")
+
+    if _needs_new_session(session_id, model, persona, temperature):
+        old_history = chat_sessions.get(session_id, {}).get("history", []) if session_id else []
+        session_id  = _create_session(model, persona, temperature, old_history)
+
+    session_data = chat_sessions[session_id]
+    now = datetime.now().strftime("%H:%M")
+
+    if not any(h["sender"] == "user" for h in session_data["history"]):
+        session_data["title"] = (message[:30] + "...") if len(message) > 30 else message
+
+    session_data["history"].append({"sender": "user", "text": message, "time": now})
+
+    def generate():
+        full_reply = ""
+        try:
+            # First, yield session metadata
+            yield f"data: {json.dumps({'type':'session','session_id':session_id,'title':session_data['title']})}\n\n"
+
+            # Stream chunks from Gemini
+            for chunk in session_data["chat"].send_message_stream(message):
+                if chunk.text:
+                    full_reply_local = chunk.text
+                    yield f"data: {json.dumps({'type':'chunk','text':full_reply_local})}\n\n"
+                    # accumulate
+            # We can't easily accumulate outside due to generator scope,
+            # so we'll store after streaming via a closure trick
+
+            yield f"data: {json.dumps({'type':'done'})}\n\n"
+
+        except Exception as e:
+            # Remove the user message we added
+            if session_data["history"] and session_data["history"][-1]["sender"] == "user":
+                session_data["history"].pop()
+            yield f"data: {json.dumps({'type':'error','message':str(e)})}\n\n"
+
+    # We need to collect the full reply to store in history.
+    # Use a wrapper that intercepts chunks.
+    def generate_and_store():
+        full_reply = []
+        try:
+            yield f"data: {json.dumps({'type':'session','session_id':session_id,'title':session_data['title']})}\n\n"
+            for chunk in session_data["chat"].send_message_stream(message):
+                if chunk.text:
+                    full_reply.append(chunk.text)
+                    yield f"data: {json.dumps({'type':'chunk','text':chunk.text})}\n\n"
+            
+            # Store the complete reply
+            complete = "".join(full_reply)
+            session_data["history"].append({"sender": "ai", "text": complete, "time": now})
+            yield f"data: {json.dumps({'type':'done'})}\n\n"
+
+        except Exception as e:
+            if session_data["history"] and session_data["history"][-1]["sender"] == "user":
+                session_data["history"].pop()
+            print(f"Stream error: {e}")
+            yield f"data: {json.dumps({'type':'error','message':str(e)})}\n\n"
+
+    return Response(
+        stream_with_context(generate_and_store()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control":   "no-cache",
+            "X-Accel-Buffering": "no",
+        }
+    )
+
+# ── Sessions API ──────────────────────────────────────
 @app.route("/api/sessions/clear", methods=["POST"])
 def clear_all_sessions():
     chat_sessions.clear()
     return jsonify({"success": True})
 
-# ── Sessions: List ───────────────────────────────────────
 @app.route("/api/sessions", methods=["GET"])
 def get_sessions():
-    sessions = [
-        {"id": sid, "title": data["title"], "model": data.get("model", DEFAULT_MODEL)}
-        for sid, data in reversed(list(chat_sessions.items()))
-    ]
-    return jsonify({"sessions": sessions})
+    return jsonify({"sessions": [
+        {"id": sid, "title": d["title"], "model": d.get("model", DEFAULT_MODEL), "persona": d.get("persona", "assistant")}
+        for sid, d in reversed(list(chat_sessions.items()))
+    ]})
 
-# ── Sessions: Get (history) ──────────────────────────────
 @app.route("/api/sessions/<session_id>", methods=["GET"])
 def get_session(session_id):
     s = chat_sessions.get(session_id)
     if not s:
         return jsonify({"error": "Session not found"}), 404
-    return jsonify({"id": session_id, "title": s["title"], "history": s["history"], "model": s.get("model", DEFAULT_MODEL)})
+    return jsonify({
+        "id":          session_id,
+        "title":       s["title"],
+        "history":     s["history"],
+        "model":       s.get("model", DEFAULT_MODEL),
+        "persona":     s.get("persona", "assistant"),
+        "temperature": s.get("temperature", 0.7),
+    })
 
-# ── Sessions: Delete ─────────────────────────────────────
 @app.route("/api/sessions/<session_id>", methods=["DELETE"])
 def delete_session(session_id):
     if session_id not in chat_sessions:
@@ -128,7 +274,6 @@ def delete_session(session_id):
     del chat_sessions[session_id]
     return jsonify({"success": True})
 
-# ── Sessions: Rename ─────────────────────────────────────
 @app.route("/api/sessions/<session_id>/rename", methods=["POST"])
 def rename_session(session_id):
     s = chat_sessions.get(session_id)
@@ -139,6 +284,10 @@ def rename_session(session_id):
         return jsonify({"error": "Title required"}), 400
     s["title"] = title[:50]
     return jsonify({"success": True, "title": s["title"]})
+
+@app.route("/api/personas", methods=["GET"])
+def get_personas():
+    return jsonify({"personas": {k: v["name"] for k, v in PERSONAS.items()}})
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

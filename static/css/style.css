@@ -134,6 +134,31 @@ body {
 .new-chat-btn:hover { opacity: .9; transform: translateY(-1px); box-shadow: 0 6px 20px var(--glow); }
 .new-chat-btn:active { transform: none; }
 
+/* ── Persona Section ─────────────────────────────────── */
+.sidebar-section { padding: 0 12px 4px; }
+.persona-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
+    margin-bottom: 4px;
+}
+.persona-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 8px 4px;
+    background: var(--bg-card); border: 1.5px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary); font-family: inherit; font-size: .72rem;
+    cursor: pointer; transition: all .2s;
+    white-space: nowrap;
+}
+.persona-chip i { font-size: 1rem; }
+.persona-chip:hover { border-color: var(--border-focus); color: var(--text-primary); background: var(--gradient-soft); }
+.persona-chip.active {
+    border-color: var(--nova-purple);
+    color: var(--nova-purple);
+    background: var(--gradient-soft);
+    font-weight: 600;
+    box-shadow: 0 0 0 3px rgba(124,92,252,.12);
+}
+
 /* Sidebar Content */
 .sidebar-content { flex:1; overflow-y: auto; padding: 0 12px; }
 .sidebar-section-title {
@@ -612,10 +637,66 @@ body {
 .scroll-to-bottom:hover { border-color: var(--border-focus); color: var(--text-primary); transform: translateY(-2px); }
 
 /* ─────────────────────────────────────────
+   TEMPERATURE SLIDER
+───────────────────────────────────────── */
+.temp-slider-row {
+    max-width: 800px; margin: 0 auto 10px;
+    display: flex; align-items: center; gap: 10px;
+}
+.temp-label-left, .temp-label-right {
+    font-size: .72rem; color: var(--text-muted);
+    display: flex; align-items: center; gap: 4px; white-space: nowrap;
+    flex-shrink: 0;
+}
+.temp-label-left i { color: var(--nova-blue); }
+.temp-label-right i { color: #f97316; }
+.temp-slider {
+    flex: 1; -webkit-appearance: none; height: 4px;
+    border-radius: var(--radius-pill);
+    background: linear-gradient(to right, var(--nova-blue), var(--nova-purple), #f97316);
+    outline: none; cursor: pointer;
+}
+.temp-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: #fff; border: 2px solid var(--nova-purple);
+    box-shadow: 0 2px 8px var(--glow);
+    cursor: pointer; transition: transform .15s;
+}
+.temp-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
+.temp-value {
+    font-size: .72rem; font-weight: 600;
+    color: var(--nova-purple);
+    min-width: 24px; text-align: right;
+}
+
+/* Voice Button – Recording State */
+.input-icon-btn.recording {
+    color: #ff4444;
+    background: rgba(255,68,68,.1);
+    animation: pulseRed 1s ease-in-out infinite;
+}
+@keyframes pulseRed {
+    0%,100% { box-shadow: 0 0 0 0 rgba(255,68,68,.4); }
+    50%      { box-shadow: 0 0 0 8px rgba(255,68,68,0); }
+}
+
+/* Streaming cursor */
+.stream-cursor {
+    display: inline-block;
+    width: 2px; height: 1em;
+    background: var(--nova-purple);
+    margin-left: 2px;
+    vertical-align: text-bottom;
+    animation: blink .75s step-end infinite;
+}
+@keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0; } }
+
+/* ─────────────────────────────────────────
    INPUT AREA
 ───────────────────────────────────────── */
 .chat-input-container {
-    padding: 16px 24px 20px;
+    padding: 12px 24px 18px;
     flex-shrink: 0;
     position: relative; z-index: 10;
 }

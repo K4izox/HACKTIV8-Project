@@ -12,50 +12,63 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <!-- Toast Notification -->
     <div id="toast" class="toast" role="alert"></div>
 
     <div class="app-container">
-        <!-- Sidebar -->
+        <!-- ── Sidebar ── -->
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <div class="logo">
-                    <div class="logo-icon">
-                        <i class="fa-solid fa-bolt"></i>
-                    </div>
+                    <div class="logo-icon"><i class="fa-solid fa-bolt"></i></div>
                     <div class="logo-text">
                         <span class="logo-name">Nova AI</span>
                         <span class="logo-tag">Pro</span>
                     </div>
                 </div>
                 <button class="new-chat-btn" id="new-chat">
-                    <i class="fa-solid fa-plus"></i>
-                    <span>New Chat</span>
+                    <i class="fa-solid fa-plus"></i><span>New Chat</span>
                 </button>
             </div>
 
+            <!-- Persona Selector -->
+            <div class="sidebar-section">
+                <p class="sidebar-section-title"><i class="fa-solid fa-masks-theater"></i> Persona</p>
+                <div class="persona-grid" id="persona-grid">
+                    <button class="persona-chip active" data-persona="assistant" title="General Assistant">
+                        <i class="fa-solid fa-robot"></i><span>Assistant</span>
+                    </button>
+                    <button class="persona-chip" data-persona="customer_service" title="Customer Service">
+                        <i class="fa-solid fa-headset"></i><span>Service</span>
+                    </button>
+                    <button class="persona-chip" data-persona="teacher" title="Teacher / Tutor">
+                        <i class="fa-solid fa-chalkboard-user"></i><span>Teacher</span>
+                    </button>
+                    <button class="persona-chip" data-persona="travel" title="Travel Guide">
+                        <i class="fa-solid fa-earth-asia"></i><span>Travel</span>
+                    </button>
+                    <button class="persona-chip" data-persona="coder" title="Code Assistant">
+                        <i class="fa-solid fa-code"></i><span>Coder</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Recent Chats -->
             <div class="sidebar-content">
-                <p class="sidebar-section-title">
-                    <i class="fa-regular fa-clock"></i> Recent
-                </p>
+                <p class="sidebar-section-title"><i class="fa-regular fa-clock"></i> Recent</p>
                 <div class="chat-history-list" id="chat-history"></div>
             </div>
 
             <div class="sidebar-footer">
                 <div class="sidebar-footer-actions">
                     <button class="footer-btn" id="export-btn" title="Export Chat">
-                        <i class="fa-solid fa-download"></i>
-                        <span>Export</span>
+                        <i class="fa-solid fa-download"></i><span>Export</span>
                     </button>
                     <button class="footer-btn" id="clear-all-btn" title="Clear All History">
-                        <i class="fa-solid fa-trash"></i>
-                        <span>Clear All</span>
+                        <i class="fa-solid fa-trash"></i><span>Clear All</span>
                     </button>
                 </div>
                 <div class="user-profile">
-                    <div class="avatar">
-                        <i class="fa-solid fa-user"></i>
-                    </div>
+                    <div class="avatar"><i class="fa-solid fa-user"></i></div>
                     <div class="user-info">
                         <span class="username">Guest User</span>
                         <span class="user-status"><i class="fa-solid fa-circle"></i> Online</span>
@@ -67,26 +80,22 @@
             </div>
         </aside>
 
-        <!-- Main Chat Area -->
+        <!-- ── Main Chat ── -->
         <main class="chat-area">
-            <!-- Header -->
             <header class="chat-header">
-                <button class="sidebar-toggle" id="sidebar-toggle" title="Toggle Sidebar">
-                    <i class="fa-solid fa-bars"></i>
-                </button>
+                <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa-solid fa-bars"></i></button>
                 <div class="header-center">
                     <div class="model-badge">
                         <i class="fa-solid fa-microchip"></i>
                         <span id="current-model">gemini-2.5-flash</span>
                         <i class="fa-solid fa-chevron-down"></i>
                     </div>
-                    <!-- Model dropdown -->
                     <div class="model-dropdown" id="model-dropdown">
                         <div class="model-option active" data-model="gemini-2.5-flash">
                             <div class="model-icon"><i class="fa-solid fa-bolt"></i></div>
                             <div class="model-info">
                                 <span class="model-name">Gemini 2.5 Flash</span>
-                                <span class="model-desc">Fast & efficient</span>
+                                <span class="model-desc">Fast &amp; efficient</span>
                             </div>
                         </div>
                         <div class="model-option" data-model="gemini-2.0-flash">
@@ -99,16 +108,12 @@
                     </div>
                 </div>
                 <div class="header-actions">
-                    <button id="search-btn" class="header-icon-btn" title="Search in chat">
-                        <i class="fa-solid fa-magnifying-glass"></i>
-                    </button>
-                    <button id="copy-session-btn" class="header-icon-btn" title="Copy session link">
-                        <i class="fa-solid fa-share-nodes"></i>
-                    </button>
+                    <button id="search-btn" class="header-icon-btn" title="Search"><i class="fa-solid fa-magnifying-glass"></i></button>
+                    <button id="copy-session-btn" class="header-icon-btn" title="Copy link"><i class="fa-solid fa-share-nodes"></i></button>
                 </div>
             </header>
 
-            <!-- Search Bar (hidden by default) -->
+            <!-- Search Bar -->
             <div class="search-bar-container" id="search-bar" style="display:none;">
                 <i class="fa-solid fa-magnifying-glass"></i>
                 <input type="text" id="search-input" placeholder="Search in this conversation…">
@@ -119,11 +124,7 @@
             <div class="chat-window" id="chat-window">
                 <div class="welcome-screen" id="welcome-screen">
                     <div class="welcome-glow"></div>
-                    <div class="welcome-icon">
-                        <div class="welcome-icon-bg">
-                            <i class="fa-solid fa-bolt"></i>
-                        </div>
-                    </div>
+                    <div class="welcome-icon-bg"><i class="fa-solid fa-bolt"></i></div>
                     <h1>Hi, I'm <span class="gradient-text">Nova</span>.</h1>
                     <p>Your intelligent AI companion. Ask me anything — I'm here to help.</p>
                     <div class="feature-pills">
@@ -149,13 +150,25 @@
                 </div>
             </div>
 
-            <!-- Scroll to Bottom Button -->
-            <button class="scroll-to-bottom" id="scroll-to-bottom" style="display:none;" title="Scroll to bottom">
+            <!-- Scroll to Bottom -->
+            <button class="scroll-to-bottom" id="scroll-to-bottom" style="display:none;">
                 <i class="fa-solid fa-chevron-down"></i>
             </button>
 
             <!-- Input Area -->
             <div class="chat-input-container">
+                <!-- Temperature Slider -->
+                <div class="temp-slider-row">
+                    <div class="temp-label-left">
+                        <i class="fa-solid fa-snowflake"></i> Precise
+                    </div>
+                    <input type="range" id="temp-slider" min="0" max="1" step="0.1" value="0.7" class="temp-slider">
+                    <div class="temp-label-right">
+                        Creative <i class="fa-solid fa-fire"></i>
+                    </div>
+                    <span class="temp-value" id="temp-value">0.7</span>
+                </div>
+
                 <div class="input-wrapper">
                     <div class="input-top">
                         <textarea id="message-input" placeholder="Message Nova…" rows="1"></textarea>
@@ -164,6 +177,9 @@
                         <div class="input-actions-left">
                             <button class="input-icon-btn" id="attach-btn" title="Attach file">
                                 <i class="fa-solid fa-paperclip"></i>
+                            </button>
+                            <button class="input-icon-btn" id="voice-btn" title="Voice input">
+                                <i class="fa-solid fa-microphone"></i>
                             </button>
                             <button class="input-icon-btn" id="browse-prompts-btn" title="Prompt library">
                                 <i class="fa-solid fa-wand-magic-sparkles"></i>
@@ -188,7 +204,7 @@
     <div class="modal-overlay" id="rename-modal" style="display:none;">
         <div class="modal">
             <h3><i class="fa-solid fa-pencil"></i> Rename Chat</h3>
-            <input type="text" id="rename-input" placeholder="Enter a new name…" maxlength="40">
+            <input type="text" id="rename-input" placeholder="Enter a new name…" maxlength="50">
             <div class="modal-actions">
                 <button class="modal-btn cancel" id="rename-cancel">Cancel</button>
                 <button class="modal-btn confirm" id="rename-confirm">Rename</button>
@@ -205,45 +221,29 @@
             </div>
             <div class="prompts-grid">
                 <div class="prompt-card" data-prompt="Write a professional email to apologize for a missed meeting.">
-                    <i class="fa-solid fa-envelope"></i>
-                    <h4>Business Email</h4>
-                    <p>Write a professional email to apologize...</p>
+                    <i class="fa-solid fa-envelope"></i><h4>Business Email</h4><p>Write a professional apology email…</p>
                 </div>
                 <div class="prompt-card" data-prompt="Create a step-by-step plan to learn Python programming in 30 days.">
-                    <i class="fa-brands fa-python"></i>
-                    <h4>Learning Plan</h4>
-                    <p>Create a 30-day Python learning plan...</p>
+                    <i class="fa-brands fa-python"></i><h4>Learning Plan</h4><p>30-day Python learning roadmap…</p>
                 </div>
                 <div class="prompt-card" data-prompt="Summarize the following text and extract the key points: ">
-                    <i class="fa-solid fa-file-lines"></i>
-                    <h4>Summarize Text</h4>
-                    <p>Summarize and extract key points...</p>
+                    <i class="fa-solid fa-file-lines"></i><h4>Summarize</h4><p>Extract key points from text…</p>
                 </div>
                 <div class="prompt-card" data-prompt="Debug this code and explain the issue:">
-                    <i class="fa-solid fa-bug"></i>
-                    <h4>Debug Code</h4>
-                    <p>Paste your code and get a fix + explanation...</p>
+                    <i class="fa-solid fa-bug"></i><h4>Debug Code</h4><p>Find and fix code bugs…</p>
                 </div>
                 <div class="prompt-card" data-prompt="Translate the following text to English: ">
-                    <i class="fa-solid fa-language"></i>
-                    <h4>Translate</h4>
-                    <p>Translate text to English...</p>
+                    <i class="fa-solid fa-language"></i><h4>Translate</h4><p>Translate any text to English…</p>
                 </div>
                 <div class="prompt-card" data-prompt="Give me 10 creative blog post ideas about technology.">
-                    <i class="fa-solid fa-lightbulb"></i>
-                    <h4>Creative Ideas</h4>
-                    <p>Generate 10 creative blog post ideas...</p>
+                    <i class="fa-solid fa-lightbulb"></i><h4>Creative Ideas</h4><p>10 creative tech blog ideas…</p>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script>
-        // Configure marked for security
-        marked.setOptions({ breaks: true, gfm: true });
-    </script>
+    <script>marked.setOptions({ breaks: true, gfm: true });</script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
