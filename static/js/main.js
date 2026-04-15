@@ -65,17 +65,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const FAV         = 'nova-favs';
     let   attachedFile = null;   // File object currently attached
 
-    /* ── Init ──────────────────────────────────────── */
-    sendBtn.disabled = true;
-    applyModel(curModel);
-    applyPersona(curPersona);
-    if (tempSelect) tempSelect.value = curTemp.toString();
-    langSelect.value = curLang;
-    applyLanguage(curLang); // Initialize UI translations
-    updateFavUI();
-    initVoice();
-    if (sessionId) loadHistory(sessionId);
-    loadSessions();
+    /* ────────── Initialization (Moved to bottom to avoid TDZ) ────────── */
+    // Initial UI state setup after all functions/data are defined
+    function initializeApp() {
+        sendBtn.disabled = true;
+        applyModel(curModel);
+        applyPersona(curPersona);
+        if (tempSelect) tempSelect.value = curTemp.toString();
+        langSelect.value = curLang;
+        applyLanguage(curLang); 
+        updateFavUI();
+        initVoice();
+        if (sessionId) loadHistory(sessionId);
+        loadSessions();
+    }
 
     /* ══════════════════════════════════════════════
        TOAST
@@ -961,4 +964,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /* Global for welcome screen suggestions */
     window.submitSuggested = txt => { msgInput.value = txt; msgInput.dispatchEvent(new Event('input')); sendMessage(); };
+
+    // Final Boot (after everything is defined)
+    initializeApp();
 });
