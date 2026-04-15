@@ -69,8 +69,6 @@ document.addEventListener('DOMContentLoaded', () => {
     sendBtn.disabled = true;
     applyModel(curModel);
     applyPersona(curPersona);
-    applyPersona(curPersona);
-    const tempSelect = document.getElementById('temp-select');
     if (tempSelect) tempSelect.value = curTemp.toString();
     langSelect.value = curLang;
     applyLanguage(curLang); // Initialize UI translations
