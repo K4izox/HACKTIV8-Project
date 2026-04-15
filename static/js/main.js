@@ -33,8 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const renameInput    = document.getElementById('rename-input');
     const renameConfirm  = document.getElementById('rename-confirm');
     const renameCancel   = document.getElementById('rename-cancel');
-    const tempSlider     = document.getElementById('temp-slider');
-    const tempValueEl    = document.getElementById('temp-value');
+    const tempSelect     = document.getElementById('temp-select');
     const voiceBtn       = document.getElementById('voice-btn');
     const personaGrid    = document.getElementById('persona-grid');
     const favOpenBtn     = document.getElementById('fav-open-btn');
@@ -70,8 +69,9 @@ document.addEventListener('DOMContentLoaded', () => {
     sendBtn.disabled = true;
     applyModel(curModel);
     applyPersona(curPersona);
-    tempSlider.value = curTemp;
-    tempValueEl.textContent = curTemp.toFixed(1);
+    applyPersona(curPersona);
+    const tempSelect = document.getElementById('temp-select');
+    if (tempSelect) tempSelect.value = curTemp.toString();
     langSelect.value = curLang;
     applyLanguage(curLang); // Initialize UI translations
     updateFavUI();
@@ -155,12 +155,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /* ══════════════════════════════════════════════
-       TEMPERATURE
+       RESPONSE STYLE (TEMPERATURE)
     ═══════════════════════════════════════════════ */
-    tempSlider.addEventListener('input', () => {
-        curTemp = parseFloat(tempSlider.value);
-        tempValueEl.textContent = curTemp.toFixed(1);
+    tempSelect.addEventListener('change', () => {
+        curTemp = parseFloat(tempSelect.value);
         localStorage.setItem('nova-temp', curTemp);
+        toast('🌡️ Response Style: ' + tempSelect.options[tempSelect.selectedIndex].text);
     });
 
     /* ══════════════════════════════════════════════
@@ -181,9 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
             'settings-title': 'Pengaturan',
             'sp-model': 'Model',
             'sp-persona': 'Persona',
-            'sp-temp': 'Kreativitas',
-            'temp-1': 'Tepat',
-            'temp-2': 'Kreatif',
+            'sp-style': 'Gaya Balasan',
             'sp-lang': 'Bahasa',
             'sp-actions': 'Aksi',
             'btn-export': '<i class="fa-solid fa-download"></i> Ekspor Chat',
@@ -210,9 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
             'settings-title': 'Settings',
             'sp-model': 'Model',
             'sp-persona': 'Persona',
-            'sp-temp': 'Creativity',
-            'temp-1': 'Precise',
-            'temp-2': 'Creative',
+            'sp-style': 'Response Style',
             'sp-lang': 'Language',
             'sp-actions': 'Actions',
             'btn-export': '<i class="fa-solid fa-download"></i> Export Chat',
@@ -239,9 +235,7 @@ document.addEventListener('DOMContentLoaded', () => {
             'settings-title': '設定',
             'sp-model': 'モデル',
             'sp-persona': 'ペルソナ',
-            'sp-temp': '創造性',
-            'temp-1': '正確',
-            'temp-2': '創造的',
+            'sp-style': '応答スタイル',
             'sp-lang': '言語',
             'sp-actions': 'アクション',
             'btn-export': '<i class="fa-solid fa-download"></i> チャットをエクスポート',
@@ -268,9 +262,7 @@ document.addEventListener('DOMContentLoaded', () => {
             'settings-title': '설정',
             'sp-model': '모델',
             'sp-persona': '페르소나',
-            'sp-temp': '창의성',
-            'temp-1': '정확함',
-            'temp-2': '창의적',
+            'sp-style': '응답 스타일',
             'sp-lang': '언어',
             'sp-actions': '작업',
             'btn-export': '<i class="fa-solid fa-download"></i> 채팅 내보내기',
@@ -297,9 +289,7 @@ document.addEventListener('DOMContentLoaded', () => {
             'settings-title': 'Paramètres',
             'sp-model': 'Modèle',
             'sp-persona': 'Personnage',
-            'sp-temp': 'Créativité',
-            'temp-1': 'Précis',
-            'temp-2': 'Créatif',
+            'sp-style': 'Style de réponse',
             'sp-lang': 'Langue',
             'sp-actions': 'Actions',
             'btn-export': '<i class="fa-solid fa-download"></i> Exporter',
@@ -339,13 +329,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const spLabels = document.querySelectorAll('.sp-label');
         if (spLabels[0]) spLabels[0].textContent = t['sp-model'];
         if (spLabels[1]) spLabels[1].textContent = t['sp-persona'];
-        if (spLabels[2]) spLabels[2].childNodes[0].textContent = t['sp-temp'] + ' ';
+        if (spLabels[2]) spLabels[2].textContent = t['sp-style'];
         if (spLabels[3]) spLabels[3].textContent = t['sp-lang'];
         if (spLabels[4]) spLabels[4].textContent = t['sp-actions'];
-
-        const tempTags = document.querySelectorAll('.temp-tag');
-        if (tempTags[0]) tempTags[0].textContent = t['temp-1'];
-        if (tempTags[1]) tempTags[1].textContent = t['temp-2'];
 
         exportBtn.innerHTML = t['btn-export'];
         
