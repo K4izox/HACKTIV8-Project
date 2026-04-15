@@ -500,6 +500,19 @@ document.addEventListener('DOMContentLoaded', () => {
     renameModal.addEventListener('click',   e => { if (e.target === renameModal) renameModal.style.display = 'none'; });
 
     /* ══════════════════════════════════════════════
+       SESSION FAVORITES
+    ═══════════════════════════════════════════════ */
+    const SESS_FAV = 'nova-sess-favs';
+    function getSessionFavs() { try { return JSON.parse(localStorage.getItem(SESS_FAV) || '[]'); } catch { return []; } }
+    function isSessionFaved(id) { return getSessionFavs().includes(id); }
+    function toggleSessionFav(id) {
+        let favs = getSessionFavs();
+        if (favs.includes(id)) favs = favs.filter(i => i !== id);
+        else favs.push(id);
+        localStorage.setItem(SESS_FAV, JSON.stringify(favs));
+    }
+
+    /* ══════════════════════════════════════════════
        SESSION LIST
     ═══════════════════════════════════════════════ */
     async function loadSessions() {
@@ -509,11 +522,24 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!data.sessions?.length) {
                 historyList.innerHTML = '<div style="color:var(--tx-3);font-size:.8rem;padding:6px 4px">No chats yet.</div>'; return;
             }
+
+            // Sort favorites to top
+            const favs = getSessionFavs();
+            data.sessions.sort((a, b) => {
+                const fa = favs.includes(a.id);
+                const fb = favs.includes(b.id);
+                if (fa && !fb) return -1;
+                if (!fa && fb) return 1;
+                return 0; // maintain time order (reversed)
+            });
+
             data.sessions.forEach(s => {
+                const isSessFav = isSessionFaved(s.id);
                 const el = document.createElement('div');
                 el.className = `history-item ${s.id === sessionId ? 'active' : ''}`;
                 el.innerHTML = `<i class="fa-regular fa-message"></i><span title="${s.title}"></span>
                     <div class="hist-actions">
+                        <button class="hist-btn fav ${isSessFav?'active':''}" title="Favorite"><i class="fa-${isSessFav?'solid':'regular'} fa-star"></i></button>
                         <button class="hist-btn ren" title="Rename"><i class="fa-solid fa-pencil"></i></button>
                         <button class="hist-btn del" title="Delete"><i class="fa-solid fa-trash"></i></button>
                     </div>`;
@@ -527,6 +553,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     await loadHistory(s.id);
                     if (window.innerWidth <= 768) sidebar.classList.remove('mobile-open');
                 });
+
+                el.querySelector('.fav').addEventListener('click', e => {
+                    e.stopPropagation();
+                    toggleSessionFav(s.id);
+                    loadSessions();
+                });
+
                 el.querySelector('.ren').addEventListener('click', e => {
                     e.stopPropagation(); renameTarget = s.id; renameInput.value = s.title;
                     renameModal.style.display = 'flex'; setTimeout(() => renameInput.focus(), 50);
@@ -557,8 +590,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.model)       applyModel(data.model);
             if (data.persona)     applyPersona(data.persona);
             if (data.temperature != null) {
-                curTemp = data.temperature; tempSlider.value = curTemp;
-                tempValueEl.textContent = parseFloat(curTemp).toFixed(1);
+                curTemp = data.temperature;
+                if (tempSelect) tempSelect.value = curTemp.toString();
             }
             scrollDown();
         } catch {}

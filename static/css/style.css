@@ -135,6 +135,8 @@ body {
 }
 .hist-btn:hover { color: var(--tx); }
 .hist-btn.del:hover { color: #ff5e6a; }
+.hist-btn.fav.active { color: #f59e0b; }
+.hist-btn.fav:hover { color: #f59e0b; }
 
 /* Sidebar Bottom */
 .sidebar-bottom {
