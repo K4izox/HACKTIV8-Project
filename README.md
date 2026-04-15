@@ -59,10 +59,6 @@
 
 ![Nova AI Main View](static/screenshots/main_view.png)
 
-> *Unified Favorites Modal — Managing pinned chats and saved messages*
-
-![Nova AI Favorites](static/screenshots/favorites_modal.png)
-
 > *Contextual Settings — Adjusting Response Style and Language*
 
 ![Nova AI Settings](static/screenshots/settings_panel.png)
