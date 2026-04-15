@@ -5,6 +5,7 @@ import mimetypes
 import random
 import requests
 import re
+import urllib.parse
 from datetime import datetime
 from flask import Flask, request, jsonify, render_template, Response, stream_with_context
 from google import genai
@@ -44,7 +45,8 @@ def generate_image_internal(prompt):
         
         # Using Pollinations AI as a highly reliable and fast fallback for this project
         seed = random.randint(1, 1000000)
-        url = f"https://image.pollinations.ai/prompt/{prompt}?width=1024&height=1024&nologo=true&seed={seed}"
+        encoded_prompt = urllib.parse.quote(prompt.strip())
+        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true&seed={seed}"
         return url
     except Exception as e:
         print(f"Image gen error: {e}")
