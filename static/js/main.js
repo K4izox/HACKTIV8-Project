@@ -827,10 +827,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             aiBub.innerHTML = typeof marked !== 'undefined' ? marked.parse(full) : full;
                             const cur = document.createElement('span'); cur.className = 'stream-cursor'; aiBub.appendChild(cur);
                             scrollDown();
-                        } else if (ev.type === 'final_processed') {
-                            full = ev.text;
-                            if (typeof marked !== 'undefined') aiBub.innerHTML = marked.parse(full);
-                            loadSessions(); scrollDown();
                         } else if (ev.type === 'done') {
                             if (typeof marked !== 'undefined') aiBub.innerHTML = marked.parse(full);
                             aiBub.querySelectorAll('pre').forEach(addCodeCopy);

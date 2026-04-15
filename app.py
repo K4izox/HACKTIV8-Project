@@ -31,69 +31,41 @@ chat_sessions = {}
 ALLOWED_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
 DEFAULT_MODEL  = "gemini-2.0-flash"
 
-def generate_image_internal(prompt):
-    """
-    Tries to generate an image using Imagen 3, falls back to Pollinations AI if restricted.
-    """
-    print(f"Generating image for: {prompt}")
-    # Fallback to Pollinations AI for consistent experience in this demo
-    # but we could attempt imagen-3.0-generate-001 if the user has it.
-    try:
-        # In a real scenario with Imagen access:
-        # response = client.models.generate_image(model='imagen-3.0-generate-001', prompt=prompt)
-        # return response.images[0].url
-        
-        # Using Pollinations AI as a highly reliable and fast fallback for this project
-        seed = random.randint(1, 1000000)
-        clean_prompt = re.sub(r'\s+', ' ', prompt).strip()
-        encoded_prompt = urllib.parse.quote(clean_prompt)
-        raw_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true&seed={seed}"
-        # Use our local proxy to ensure the image always loads and avoids browser/network issues
-        proxy_url = f"/api/image-proxy?url={urllib.parse.quote(raw_url)}"
-        print(f"Proxied URL: {proxy_url}")
-        return proxy_url
-    except Exception as e:
-        print(f"Image gen error: {e}")
-        return None
-
 # ── Personas ──────────────────────────────────────────
 PERSONAS = {
     "assistant": {
         "name": "General Assistant",
         "instruction": (
             "You are Nova, a highly capable, friendly, and knowledgeable AI assistant. "
-            "Give clear, well-structured, and concise answers. "
-            "IMAGE CAPABILITY: You can generate images. If the user asks for a picture, drawing, or image, "
-            "refine their request into a high-quality, detailed English prompt. Add keywords like 'masterpiece', '8k', 'cinematic lighting', 'highly detailed', or specific art styles if appropriate. "
-            "Use the exact syntax: IMAGE_GEN(refined detailed prompt here)."
+            "Give clear, well-structured, and concise answers."
         )
     },
     "customer_service": {
         "name": "Customer Service",
         "instruction": (
             "You are Nova, a professional and empathetic customer service representative. "
-            "If showing a visual would help, use: IMAGE_GEN(photorealistic professional visual description)."
+            "Always greet the user warmly, be polite, solution-oriented, and patient."
         )
     },
     "teacher": {
         "name": "Teacher / Tutor",
         "instruction": (
             "You are Nova, an experienced and patient educator and tutor. "
-            "Use visuals to help explain by using: IMAGE_GEN(clear educational illustration or realistic scene, high quality)."
+            "Explain concepts step by step, using simple language and real-world examples."
         )
     },
     "travel": {
         "name": "Travel Guide",
         "instruction": (
             "You are Nova, an expert travel guide. "
-            "Show the traveler a stunning preview using: IMAGE_GEN(breathtaking cinematic photography of the destination, masterpiece, vibrant colors)."
+            "Provide travel tips and itinerary suggestions clearly."
         )
     },
     "coder": {
         "name": "Code Assistant",
         "instruction": (
             "You are Nova, an expert software engineer. "
-            "If you need to show a mockup or diagram, use: IMAGE_GEN(clean modern UI mockup or technical diagram, high resolution)."
+            "Help with coding and debugging."
         )
     }
 }
@@ -234,24 +206,7 @@ def chat_stream():
             
             # Store the complete reply
             complete = "".join(full_reply)
-            
-            # Post-process for Image Generation
-            def replace_img_gen(match):
-                prompt = match.group(1)
-                img_url = generate_image_internal(prompt)
-                if img_url:
-                    return f"\n\n![Generated Image]({img_url})\n\n"
-                return "\n\n*(Failed to generate image)*\n\n"
-            
-            complete = re.sub(r'IMAGE_GEN\((.*?)\)', replace_img_gen, complete, flags=re.DOTALL)
-
             session_data["history"].append({"sender": "ai", "text": complete, "time": now})
-            
-            # Since streaming is done, we send a final message if needed, 
-            # but usually the frontend expects the chunks.
-            # However, for IMAGE_GEN, the last chunks might contain the raw text.
-            # We should ideally send a custom packet for the final processed text.
-            yield f"data: {json.dumps({'type':'final_processed','text':complete})}\n\n"
             yield f"data: {json.dumps({'type':'done'})}\n\n"
 
         except Exception as e:
@@ -375,14 +330,7 @@ def chat_upload():
                     full.append(chunk.text)
                     yield f"data: {json.dumps({'type':'chunk','text':chunk.text})}\n\n"
             complete = "".join(full)
-            def replace_img_gen(match):
-                prompt = match.group(1)
-                img_url = generate_image_internal(prompt)
-                if img_url: return f"\n\n![Generated Image]({img_url})\n\n"
-                return "\n\n*(Failed to generate image)*\n\n"
-            complete = re.sub(r'IMAGE_GEN\((.*?)\)', replace_img_gen, complete, flags=re.DOTALL)
             session_data["history"].append({"sender": "ai", "text": complete, "time": now})
-            yield f"data: {json.dumps({'type':'final_processed','text':complete})}\n\n"
             yield f"data: {json.dumps({'type':'done'})}\n\n"
         except Exception as e:
             if session_data["history"] and session_data["history"][-1]["sender"] == "user":
@@ -445,15 +393,6 @@ def rename_session(session_id):
 def get_personas():
     return jsonify({"personas": {k: v["name"] for k, v in PERSONAS.items()}})
 
-@app.route("/api/image-proxy")
-def image_proxy():
-    url = request.args.get("url")
-    if not url: return "URL missing", 400
-    try:
-        r = requests.get(url, stream=True, timeout=10)
-        return Response(r.content, content_type=r.headers.get('Content-Type', 'image/jpeg'))
-    except Exception as e:
-        return str(e), 500
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

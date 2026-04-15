@@ -308,17 +308,6 @@ body {
 .ai .msg-bubble li+li { margin-top:.25em; }
 .ai .msg-bubble a { color:var(--purple); text-decoration:none; }
 .ai .msg-bubble a:hover { text-decoration:underline; }
-.ai .msg-bubble img {
-    max-width: 100%; height: auto; border-radius: 12px;
-    margin: 12px 0; display: block;
-    border: 1px solid var(--border);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-.ai .msg-bubble img:hover {
-    transform: scale(1.01);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.2);
-}
 .ai .msg-bubble blockquote { border-left:3px solid var(--purple); padding-left:10px; margin:.5em 0; color:var(--tx-2); font-style:italic; }
 .ai .msg-bubble table { border-collapse:collapse; width:100%; margin:.5em 0; font-size:.85em; }
 .ai .msg-bubble th { background:rgba(124,92,252,.1); }
