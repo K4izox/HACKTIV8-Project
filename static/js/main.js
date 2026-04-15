@@ -1,89 +1,85 @@
 /* =====================================================
-   Nova AI – Full Feature JavaScript
+   Nova AI – Main JS (Clean Minimal UI)
    ===================================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
 
-    /* ── DOM Refs ──────────────────────────────────── */
-    const messageInput    = document.getElementById('message-input');
-    const sendBtn         = document.getElementById('send-btn');
-    const chatWindow      = document.getElementById('chat-window');
-    const welcomeScreen   = document.getElementById('welcome-screen');
-    const themeToggle     = document.getElementById('theme-toggle');
-    const chatHistoryList = document.getElementById('chat-history');
-    const newChatBtn      = document.getElementById('new-chat');
-    const sidebarToggle   = document.getElementById('sidebar-toggle');
-    const sidebar         = document.getElementById('sidebar');
-    const exportBtn       = document.getElementById('export-btn');
-    const clearAllBtn     = document.getElementById('clear-all-btn');
-    const charCount       = document.getElementById('char-count');
-    const scrollDownBtn   = document.getElementById('scroll-to-bottom');
-    const searchBtn       = document.getElementById('search-btn');
-    const searchBar       = document.getElementById('search-bar');
-    const searchInput     = document.getElementById('search-input');
-    const searchClose     = document.getElementById('search-close');
-    const modelBadge      = document.querySelector('.model-badge');
-    const modelDropdown   = document.getElementById('model-dropdown');
-    const currentModelEl  = document.getElementById('current-model');
-    const attachBtn       = document.getElementById('attach-btn');
-    const browsePrompts   = document.getElementById('browse-prompts-btn');
-    const promptsModal    = document.getElementById('prompts-modal');
-    const promptsClose    = document.getElementById('prompts-close');
-    const renameModal     = document.getElementById('rename-modal');
-    const renameInput     = document.getElementById('rename-input');
-    const renameConfirm   = document.getElementById('rename-confirm');
-    const renameCancel    = document.getElementById('rename-cancel');
-    const copySessionBtn  = document.getElementById('copy-session-btn');
-    const tempSlider      = document.getElementById('temp-slider');
-    const tempValueEl     = document.getElementById('temp-value');
-    const voiceBtn        = document.getElementById('voice-btn');
-    const personaGrid     = document.getElementById('persona-grid');
-    const favoritesBtn    = document.getElementById('favorites-btn');
-    const favoritesModal  = document.getElementById('favorites-modal');
-    const favoritesClose  = document.getElementById('favorites-close');
-    const favoritesList   = document.getElementById('favorites-list');
-    const favCountEl      = document.getElementById('fav-count');
+    /* ── DOM ──────────────────────────────────────── */
+    const msgInput       = document.getElementById('message-input');
+    const sendBtn        = document.getElementById('send-btn');
+    const chatView       = document.getElementById('chat-window');
+    const welcomeScreen  = document.getElementById('welcome-screen');
+    const themeToggle    = document.getElementById('theme-toggle');
+    const historyList    = document.getElementById('chat-history');
+    const newChatBtn     = document.getElementById('new-chat');
+    const sidebarToggle  = document.getElementById('sidebar-toggle');
+    const sidebar        = document.getElementById('sidebar');
+    const exportBtn      = document.getElementById('export-btn');
+    const clearAllBtn    = document.getElementById('clear-all-btn');
+    const charCount      = document.getElementById('char-count');
+    const scrollBtn      = document.getElementById('scroll-to-bottom');
+    const searchBtn      = document.getElementById('search-btn');
+    const searchStrip    = document.getElementById('search-strip');
+    const searchInput    = document.getElementById('search-input');
+    const searchClose    = document.getElementById('search-close');
+    const settingsBtn    = document.getElementById('settings-btn');
+    const settingsPanel  = document.getElementById('settings-panel');
+    const settingsClose  = document.getElementById('settings-close');
+    const settingsOverlay= document.getElementById('settings-overlay');
+    const browsePrompts  = document.getElementById('browse-prompts-btn');
+    const promptsModal   = document.getElementById('prompts-modal');
+    const promptsClose   = document.getElementById('prompts-close');
+    const renameModal    = document.getElementById('rename-modal');
+    const renameInput    = document.getElementById('rename-input');
+    const renameConfirm  = document.getElementById('rename-confirm');
+    const renameCancel   = document.getElementById('rename-cancel');
+    const tempSlider     = document.getElementById('temp-slider');
+    const tempValueEl    = document.getElementById('temp-value');
+    const voiceBtn       = document.getElementById('voice-btn');
+    const personaGrid    = document.getElementById('persona-grid');
+    const favOpenBtn     = document.getElementById('fav-open-btn');
+    const favFromSettings= document.getElementById('fav-from-settings-btn');
+    const favDot         = document.getElementById('fav-dot');
+    const favCount       = document.getElementById('fav-count');
+    const favModal       = document.getElementById('favorites-modal');
+    const favClose       = document.getElementById('favorites-close');
+    const favList        = document.getElementById('favorites-list');
 
     /* ── State ─────────────────────────────────────── */
-    let sessionId      = sessionStorage.getItem('chat_session_id') || null;
-    let isWaiting      = false;
-    let currentModel   = localStorage.getItem('nova-model')       || 'gemini-2.5-flash';
-    let currentPersona = localStorage.getItem('nova-persona')     || 'assistant';
-    let currentTemp    = parseFloat(localStorage.getItem('nova-temp') || '0.7');
-    let renameTarget   = null;
-    let isRecording    = false;
-    let recognition    = null;
-
-    const FAV_KEY = 'nova-favorites';
+    let sessionId     = sessionStorage.getItem('sid') || null;
+    let isWaiting     = false;
+    let curModel      = localStorage.getItem('nova-model')   || 'gemini-2.5-flash';
+    let curPersona    = localStorage.getItem('nova-persona') || 'assistant';
+    let curTemp       = parseFloat(localStorage.getItem('nova-temp') || '0.7');
+    let renameTarget  = null;
+    let recognition   = null;
+    let isRecording   = false;
+    const FAV         = 'nova-favs';
 
     /* ── Init ──────────────────────────────────────── */
     sendBtn.disabled = true;
-    applyModelUI(currentModel);
-    applyPersonaUI(currentPersona);
-    tempSlider.value   = currentTemp;
-    tempValueEl.textContent = currentTemp.toFixed(1);
-    updateFavBadge();
+    applyModel(curModel);
+    applyPersona(curPersona);
+    tempSlider.value = curTemp;
+    tempValueEl.textContent = curTemp.toFixed(1);
+    updateFavUI();
     initVoice();
-
-    if (sessionId) loadSessionHistory(sessionId);
+    if (sessionId) loadHistory(sessionId);
     loadSessions();
 
-    /* ═══════════════════════════════════════════
+    /* ══════════════════════════════════════════════
        TOAST
-    ════════════════════════════════════════════ */
-    function showToast(msg, ms = 2500) {
-        const t = document.getElementById('toast');
-        t.textContent = msg;
-        t.classList.add('show');
-        clearTimeout(t._timer);
-        t._timer = setTimeout(() => t.classList.remove('show'), ms);
+    ═══════════════════════════════════════════════ */
+    function toast(msg, ms = 2400) {
+        const el = document.getElementById('toast');
+        el.textContent = msg; el.classList.add('show');
+        clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), ms);
     }
 
-    /* ═══════════════════════════════════════════
+    /* ══════════════════════════════════════════════
        THEME
-    ════════════════════════════════════════════ */
-    const saved = localStorage.getItem('nova-theme') || 'dark';
-    if (saved === 'light') {
+    ═══════════════════════════════════════════════ */
+    if (localStorage.getItem('nova-theme') === 'light') {
         document.body.classList.add('light-theme');
         themeToggle.querySelector('i').className = 'fa-regular fa-sun';
     }
@@ -91,689 +87,513 @@ document.addEventListener('DOMContentLoaded', () => {
         const light = document.body.classList.toggle('light-theme');
         themeToggle.querySelector('i').className = light ? 'fa-regular fa-sun' : 'fa-regular fa-moon';
         localStorage.setItem('nova-theme', light ? 'light' : 'dark');
-        showToast(light ? '☀️ Light mode' : '🌙 Dark mode');
+        toast(light ? '☀️ Light mode' : '🌙 Dark mode');
     });
 
-    /* ═══════════════════════════════════════════
-       SIDEBAR TOGGLE
-    ════════════════════════════════════════════ */
+    /* ══════════════════════════════════════════════
+       SIDEBAR
+    ═══════════════════════════════════════════════ */
     sidebarToggle.addEventListener('click', () => {
         if (window.innerWidth <= 768) sidebar.classList.toggle('mobile-open');
         else                          sidebar.classList.toggle('collapsed');
     });
-    document.addEventListener('click', (e) => {
-        if (window.innerWidth <= 768 &&
-            sidebar.classList.contains('mobile-open') &&
-            !sidebar.contains(e.target) &&
-            e.target !== sidebarToggle) sidebar.classList.remove('mobile-open');
+    document.addEventListener('click', e => {
+        if (window.innerWidth <= 768 && sidebar.classList.contains('mobile-open') &&
+            !sidebar.contains(e.target) && e.target !== sidebarToggle)
+            sidebar.classList.remove('mobile-open');
     });
 
-    /* ═══════════════════════════════════════════
-       MODEL PICKER
-    ════════════════════════════════════════════ */
-    modelBadge.addEventListener('click', (e) => { e.stopPropagation(); modelDropdown.classList.toggle('open'); });
-    document.addEventListener('click', () => modelDropdown.classList.remove('open'));
+    /* ══════════════════════════════════════════════
+       SETTINGS PANEL
+    ═══════════════════════════════════════════════ */
+    function openSettings() { settingsPanel.classList.add('open'); settingsOverlay.style.display = 'block'; }
+    function closeSettings() { settingsPanel.classList.remove('open'); settingsOverlay.style.display = 'none'; }
+    settingsBtn.addEventListener('click', openSettings);
+    settingsClose.addEventListener('click', closeSettings);
+    settingsOverlay.addEventListener('click', closeSettings);
 
-    document.querySelectorAll('.model-option').forEach(opt => {
-        opt.addEventListener('click', (e) => {
-            e.stopPropagation();
-            currentModel = opt.dataset.model;
-            localStorage.setItem('nova-model', currentModel);
-            applyModelUI(currentModel);
-            modelDropdown.classList.remove('open');
-            showToast(`⚡ Switched to ${currentModel}`);
+    /* ══════════════════════════════════════════════
+       MODEL
+    ═══════════════════════════════════════════════ */
+    document.querySelectorAll('.model-chip').forEach(c => {
+        c.addEventListener('click', () => {
+            curModel = c.dataset.model;
+            localStorage.setItem('nova-model', curModel);
+            applyModel(curModel);
+            toast('⚡ Model: ' + curModel);
         });
     });
-
-    function applyModelUI(m) {
-        currentModelEl.textContent = m;
-        document.querySelectorAll('.model-option').forEach(o => o.classList.toggle('active', o.dataset.model === m));
+    function applyModel(m) {
+        document.querySelectorAll('.model-chip').forEach(c => c.classList.toggle('active', c.dataset.model === m));
     }
 
-    /* ═══════════════════════════════════════════
-       PERSONA SELECTOR
-    ════════════════════════════════════════════ */
-    personaGrid.querySelectorAll('.persona-chip').forEach(chip => {
-        chip.addEventListener('click', () => {
-            currentPersona = chip.dataset.persona;
-            localStorage.setItem('nova-persona', currentPersona);
-            applyPersonaUI(currentPersona);
-            showToast(`🎭 Persona: ${chip.querySelector('span').textContent}`);
+    /* ══════════════════════════════════════════════
+       PERSONA
+    ═══════════════════════════════════════════════ */
+    personaGrid.querySelectorAll('.persona-chip').forEach(c => {
+        c.addEventListener('click', () => {
+            curPersona = c.dataset.persona;
+            localStorage.setItem('nova-persona', curPersona);
+            applyPersona(curPersona);
+            toast('🎭 ' + c.querySelector('span').textContent);
         });
     });
-
-    function applyPersonaUI(p) {
+    function applyPersona(p) {
         personaGrid.querySelectorAll('.persona-chip').forEach(c => c.classList.toggle('active', c.dataset.persona === p));
     }
 
-    /* ═══════════════════════════════════════════
-       TEMPERATURE SLIDER
-    ════════════════════════════════════════════ */
+    /* ══════════════════════════════════════════════
+       TEMPERATURE
+    ═══════════════════════════════════════════════ */
     tempSlider.addEventListener('input', () => {
-        currentTemp = parseFloat(tempSlider.value);
-        tempValueEl.textContent = currentTemp.toFixed(1);
-        localStorage.setItem('nova-temp', currentTemp);
+        curTemp = parseFloat(tempSlider.value);
+        tempValueEl.textContent = curTemp.toFixed(1);
+        localStorage.setItem('nova-temp', curTemp);
     });
 
-    /* ═══════════════════════════════════════════
+    /* ══════════════════════════════════════════════
        VOICE INPUT
-    ════════════════════════════════════════════ */
+    ═══════════════════════════════════════════════ */
     function initVoice() {
         const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SR) {
-            voiceBtn.title  = 'Voice input not supported in this browser';
-            voiceBtn.style.opacity = '0.4';
-            voiceBtn.style.cursor  = 'not-allowed';
-            return;
-        }
-        recognition              = new SR();
-        recognition.lang         = 'id-ID';
-        recognition.continuous   = false;
-        recognition.interimResults = true;
-
-        recognition.onstart = () => {
-            isRecording = true;
-            voiceBtn.classList.add('recording');
-            voiceBtn.title = 'Listening… click to stop';
-            showToast('🎙️ Listening…');
+        if (!SR) { voiceBtn.style.opacity = '.35'; voiceBtn.style.cursor = 'not-allowed'; voiceBtn.title = 'Not supported'; return; }
+        recognition = new SR();
+        recognition.lang = 'id-ID'; recognition.interimResults = true;
+        recognition.onstart  = () => { isRecording = true;  voiceBtn.classList.add('recording'); toast('🎙️ Listening…'); };
+        recognition.onresult = e => {
+            let fin = '';
+            for (let i = e.resultIndex; i < e.results.length; i++) if (e.results[i].isFinal) fin += e.results[i][0].transcript;
+            if (fin) { msgInput.value = (msgInput.value + ' ' + fin).trim(); msgInput.dispatchEvent(new Event('input')); }
         };
-        recognition.onresult = (e) => {
-            let final = '';
-            for (let i = e.resultIndex; i < e.results.length; i++)
-                if (e.results[i].isFinal) final += e.results[i][0].transcript;
-            if (final) {
-                messageInput.value = (messageInput.value + ' ' + final).trim();
-                messageInput.dispatchEvent(new Event('input'));
-            }
-        };
-        recognition.onerror = (e) => { showToast('❌ Voice error: ' + e.error); stopRecording(); };
-        recognition.onend   = stopRecording;
-
+        recognition.onerror  = e => { toast('❌ Voice: ' + e.error); stopRec(); };
+        recognition.onend    = stopRec;
         voiceBtn.addEventListener('click', () => { if (isRecording) recognition.stop(); else recognition.start(); });
     }
-    function stopRecording() {
-        isRecording = false; voiceBtn.classList.remove('recording'); voiceBtn.title = 'Voice input';
-    }
+    function stopRec() { isRecording = false; voiceBtn.classList.remove('recording'); }
 
-    /* ═══════════════════════════════════════════
+    /* ══════════════════════════════════════════════
        TEXTAREA
-    ════════════════════════════════════════════ */
-    messageInput.addEventListener('input', () => {
-        messageInput.style.height = 'auto';
-        messageInput.style.height = Math.min(messageInput.scrollHeight, 200) + 'px';
-        const len = messageInput.value.length;
-        charCount.textContent = len;
-        charCount.className   = 'char-count' + (len > 3800 ? ' danger' : len > 3000 ? ' warning' : '');
-        sendBtn.disabled = !messageInput.value.trim() || isWaiting;
+    ═══════════════════════════════════════════════ */
+    msgInput.addEventListener('input', () => {
+        msgInput.style.height = 'auto';
+        msgInput.style.height = Math.min(msgInput.scrollHeight, 180) + 'px';
+        const n = msgInput.value.length;
+        charCount.textContent = n;
+        charCount.className   = 'char-counter' + (n > 3800 ? ' bad' : n > 3000 ? ' warn' : '');
+        sendBtn.disabled = !msgInput.value.trim() || isWaiting;
     });
-    messageInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
+    msgInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
     sendBtn.addEventListener('click', sendMessage);
 
-    /* ═══════════════════════════════════════════
+    /* ══════════════════════════════════════════════
        NEW CHAT
-    ════════════════════════════════════════════ */
-    newChatBtn.addEventListener('click', startNewChat);
-
-    function startNewChat() {
-        sessionStorage.removeItem('chat_session_id');
-        sessionId = null;
-        chatWindow.innerHTML = '';
-        chatWindow.appendChild(welcomeScreen);
+    ═══════════════════════════════════════════════ */
+    newChatBtn.addEventListener('click', startNew);
+    function startNew() {
+        sessionStorage.removeItem('sid'); sessionId = null;
+        chatView.innerHTML = ''; chatView.appendChild(welcomeScreen);
         welcomeScreen.style.display = 'flex';
-        messageInput.value  = '';
-        messageInput.style.height = 'auto';
-        charCount.textContent = '0';
-        sendBtn.disabled = true;
-        scrollDownBtn.style.display = 'none';
+        msgInput.value = ''; msgInput.style.height = 'auto';
+        charCount.textContent = '0'; sendBtn.disabled = true;
+        scrollBtn.style.display = 'none';
         loadSessions();
         if (window.innerWidth <= 768) sidebar.classList.remove('mobile-open');
     }
 
-    /* ═══════════════════════════════════════════
+    /* ══════════════════════════════════════════════
        SCROLL
-    ════════════════════════════════════════════ */
-    chatWindow.addEventListener('scroll', () => {
-        const near = chatWindow.scrollHeight - chatWindow.scrollTop - chatWindow.clientHeight < 120;
-        scrollDownBtn.style.display = near ? 'none' : 'flex';
+    ═══════════════════════════════════════════════ */
+    chatView.addEventListener('scroll', () => {
+        scrollBtn.style.display = chatView.scrollHeight - chatView.scrollTop - chatView.clientHeight < 100 ? 'none' : 'flex';
     });
-    scrollDownBtn.addEventListener('click', scrollToBottom);
-    function scrollToBottom() { chatWindow.scrollTo({ top: chatWindow.scrollHeight, behavior: 'smooth' }); }
+    scrollBtn.addEventListener('click', scrollDown);
+    function scrollDown() { chatView.scrollTo({ top: chatView.scrollHeight, behavior: 'smooth' }); }
 
-    /* ═══════════════════════════════════════════
+    /* ══════════════════════════════════════════════
        SEARCH
-    ════════════════════════════════════════════ */
-    let searchVisible = false;
+    ═══════════════════════════════════════════════ */
+    let searchOn = false;
     searchBtn.addEventListener('click', () => {
-        searchVisible = !searchVisible;
-        searchBar.style.display = searchVisible ? 'flex' : 'none';
-        if (searchVisible) searchInput.focus(); else clearHighlights();
+        searchOn = !searchOn;
+        searchStrip.style.display = searchOn ? 'flex' : 'none';
+        if (searchOn) searchInput.focus(); else clearHL();
     });
-    searchClose.addEventListener('click', () => {
-        searchVisible = false; searchBar.style.display = 'none';
-        clearHighlights(); searchInput.value = '';
-    });
+    searchClose.addEventListener('click', () => { searchOn = false; searchStrip.style.display = 'none'; clearHL(); searchInput.value = ''; });
     searchInput.addEventListener('input', () => {
-        clearHighlights();
+        clearHL();
         const q = searchInput.value.trim().toLowerCase();
-        if (q) chatWindow.querySelectorAll('.message-bubble').forEach(b => doHighlight(b, q));
+        if (q) chatView.querySelectorAll('.msg-bubble').forEach(b => doHL(b, q));
     });
-
-    function doHighlight(root, q) {
-        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-        const nodes = [];
-        let n;
-        while ((n = walker.nextNode())) nodes.push(n);
+    function doHL(root, q) {
+        const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); const nodes = [];
+        let n; while ((n = w.nextNode())) nodes.push(n);
         nodes.forEach(node => {
-            const i = node.textContent.toLowerCase().indexOf(q);
-            if (i < 0) return;
-            const mark = document.createElement('mark');
-            mark.className = 'highlight';
-            const after = node.splitText(i);
-            after.splitText(q.length);
-            node.after(mark);
-            mark.appendChild(after);
+            const i = node.textContent.toLowerCase().indexOf(q); if (i < 0) return;
+            const mark = document.createElement('mark'); mark.className = 'hl';
+            const after = node.splitText(i); after.splitText(q.length);
+            node.after(mark); mark.appendChild(after);
         });
     }
-    function clearHighlights() {
-        chatWindow.querySelectorAll('mark.highlight').forEach(m => m.replaceWith(m.textContent));
-        chatWindow.normalize();
-    }
+    function clearHL() { chatView.querySelectorAll('mark.hl').forEach(m => m.replaceWith(m.textContent)); chatView.normalize(); }
 
-    /* ═══════════════════════════════════════════
+    /* ══════════════════════════════════════════════
        EXPORT
-    ════════════════════════════════════════════ */
+    ═══════════════════════════════════════════════ */
     exportBtn.addEventListener('click', () => {
-        const msgs = chatWindow.querySelectorAll('.message-container');
-        if (!msgs.length) { showToast('💬 No chat to export.'); return; }
-        let out = `Nova AI – Chat Export\n${'='.repeat(40)}\n\n`;
+        const msgs = chatView.querySelectorAll('.msg-wrap');
+        if (!msgs.length) { toast('💬 No chat to export.'); return; }
+        let out = `Nova AI – Export\n${'═'.repeat(36)}\n\n`;
         msgs.forEach(c => {
-            const who  = c.classList.contains('user') ? 'You' : 'Nova';
-            const text = (c.querySelector('.message-bubble')?.innerText || '').trim();
-            out += `${who}:\n${text}\n\n`;
+            out += `${c.classList.contains('user') ? 'You' : 'Nova'}:\n${(c.querySelector('.msg-bubble')?.innerText || '').trim()}\n\n`;
         });
-        const a = Object.assign(document.createElement('a'), {
+        Object.assign(document.createElement('a'), {
             href: URL.createObjectURL(new Blob([out], { type: 'text/plain' })),
-            download: `nova-chat-${new Date().toISOString().slice(0,10)}.txt`,
-        });
-        a.click();
-        showToast('📄 Chat exported!');
+            download: `nova-${new Date().toISOString().slice(0,10)}.txt`
+        }).click();
+        toast('📄 Exported!');
     });
 
-    /* ═══════════════════════════════════════════
+    /* ══════════════════════════════════════════════
        CLEAR ALL
-    ════════════════════════════════════════════ */
+    ═══════════════════════════════════════════════ */
     clearAllBtn.addEventListener('click', () => {
-        if (!confirm('Delete all chat history? This cannot be undone.')) return;
+        if (!confirm('Delete all chat history?')) return;
         fetch('/api/sessions/clear', { method: 'POST' })
-            .then(r => { if (!r.ok) throw new Error(); })
-            .then(() => { startNewChat(); showToast('🗑️ All chats cleared.'); })
-            .catch(() => showToast('❌ Error clearing chats.'));
+            .then(r => { if (!r.ok) throw 0; })
+            .then(() => { startNew(); closeSettings(); toast('🗑️ All cleared.'); })
+            .catch(() => toast('❌ Failed.'));
     });
 
-    /* ═══════════════════════════════════════════
-       COPY SESSION LINK
-    ════════════════════════════════════════════ */
-    copySessionBtn.addEventListener('click', () => {
-        const link = window.location.origin + '/?session=' + (sessionId || '');
-        navigator.clipboard.writeText(link)
-            .then(()  => showToast('🔗 Session link copied!'))
-            .catch(()  => showToast('❌ Copy failed.'));
-    });
-
-    /* ATTACH (placeholder) */
-    attachBtn.addEventListener('click', () => showToast('📎 File upload coming soon!'));
-
-    /* ═══════════════════════════════════════════
+    /* ══════════════════════════════════════════════
        PROMPT LIBRARY
-    ════════════════════════════════════════════ */
+    ═══════════════════════════════════════════════ */
     browsePrompts.addEventListener('click', () => promptsModal.style.display = 'flex');
     promptsClose.addEventListener('click',  () => promptsModal.style.display = 'none');
-    promptsModal.addEventListener('click', e => { if (e.target === promptsModal) promptsModal.style.display = 'none'; });
+    promptsModal.addEventListener('click',  e => { if (e.target === promptsModal) promptsModal.style.display = 'none'; });
     document.querySelectorAll('.prompt-card').forEach(card => {
         card.addEventListener('click', () => {
-            messageInput.value = card.dataset.prompt;
-            messageInput.dispatchEvent(new Event('input'));
-            promptsModal.style.display = 'none';
-            messageInput.focus();
+            msgInput.value = card.dataset.prompt;
+            msgInput.dispatchEvent(new Event('input'));
+            promptsModal.style.display = 'none'; msgInput.focus();
         });
     });
 
-    /* ═══════════════════════════════════════════
+    /* ══════════════════════════════════════════════
        RENAME MODAL
-    ════════════════════════════════════════════ */
+    ═══════════════════════════════════════════════ */
     renameConfirm.addEventListener('click', async () => {
         const title = renameInput.value.trim();
         if (!title || !renameTarget) return;
-        try {
-            const r = await fetch(`/api/sessions/${renameTarget}/rename`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title }),
-            });
-            if (!r.ok) throw new Error();
-            renameModal.style.display = 'none';
-            loadSessions();
-            showToast('✏️ Chat renamed!');
-        } catch { showToast('❌ Rename failed.'); }
+        const r = await fetch(`/api/sessions/${renameTarget}/rename`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title })
+        });
+        if (r.ok) { renameModal.style.display = 'none'; loadSessions(); toast('✏️ Renamed!'); }
+        else toast('❌ Failed.');
     });
     renameInput.addEventListener('keydown', e => { if (e.key === 'Enter') renameConfirm.click(); });
     renameCancel.addEventListener('click',  () => renameModal.style.display = 'none');
     renameModal.addEventListener('click',   e => { if (e.target === renameModal) renameModal.style.display = 'none'; });
 
-    /* ═══════════════════════════════════════════
-       SESSION LIST (SIDEBAR)
-    ════════════════════════════════════════════ */
+    /* ══════════════════════════════════════════════
+       SESSION LIST
+    ═══════════════════════════════════════════════ */
     async function loadSessions() {
         try {
-            const r    = await fetch('/api/sessions');
-            const data = await r.json();
-            chatHistoryList.innerHTML = '';
+            const data = await fetch('/api/sessions').then(r => r.json());
+            historyList.innerHTML = '';
             if (!data.sessions?.length) {
-                chatHistoryList.innerHTML = '<div style="color:var(--text-muted);font-size:.8rem;padding:8px 6px;">No chats yet.</div>';
-                return;
+                historyList.innerHTML = '<div style="color:var(--tx-3);font-size:.8rem;padding:6px 4px">No chats yet.</div>'; return;
             }
             data.sessions.forEach(s => {
-                const div = document.createElement('div');
-                div.className = `history-item ${s.id === sessionId ? 'active' : ''}`;
-                div.innerHTML = `
-                    <i class="fa-regular fa-message"></i>
-                    <span title="${s.title}"></span>
-                    <div class="history-actions">
-                        <button class="history-action-btn rename" title="Rename"><i class="fa-solid fa-pencil"></i></button>
-                        <button class="history-action-btn delete" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                const el = document.createElement('div');
+                el.className = `history-item ${s.id === sessionId ? 'active' : ''}`;
+                el.innerHTML = `<i class="fa-regular fa-message"></i><span title="${s.title}"></span>
+                    <div class="hist-actions">
+                        <button class="hist-btn ren" title="Rename"><i class="fa-solid fa-pencil"></i></button>
+                        <button class="hist-btn del" title="Delete"><i class="fa-solid fa-trash"></i></button>
                     </div>`;
-                div.querySelector('span').textContent = s.title;
+                el.querySelector('span').textContent = s.title;
 
-                div.addEventListener('click', async e => {
-                    if (e.target.closest('.history-actions')) return;
-                    sessionId = s.id;
-                    sessionStorage.setItem('chat_session_id', s.id);
+                el.addEventListener('click', async e => {
+                    if (e.target.closest('.hist-actions')) return;
+                    sessionId = s.id; sessionStorage.setItem('sid', s.id);
                     document.querySelectorAll('.history-item').forEach(h => h.classList.remove('active'));
-                    div.classList.add('active');
-                    await loadSessionHistory(s.id);
+                    el.classList.add('active');
+                    await loadHistory(s.id);
                     if (window.innerWidth <= 768) sidebar.classList.remove('mobile-open');
                 });
-
-                div.querySelector('.rename').addEventListener('click', e => {
-                    e.stopPropagation();
-                    renameTarget     = s.id;
-                    renameInput.value = s.title;
-                    renameModal.style.display = 'flex';
-                    setTimeout(() => renameInput.focus(), 50);
+                el.querySelector('.ren').addEventListener('click', e => {
+                    e.stopPropagation(); renameTarget = s.id; renameInput.value = s.title;
+                    renameModal.style.display = 'flex'; setTimeout(() => renameInput.focus(), 50);
                 });
-
-                div.querySelector('.delete').addEventListener('click', async e => {
+                el.querySelector('.del').addEventListener('click', async e => {
                     e.stopPropagation();
                     if (!confirm(`Delete "${s.title}"?`)) return;
                     const r = await fetch(`/api/sessions/${s.id}`, { method: 'DELETE' });
-                    if (r.ok) { showToast('🗑️ Chat deleted.'); if (s.id === sessionId) startNewChat(); else loadSessions(); }
-                    else showToast('❌ Delete failed.');
+                    if (r.ok) { toast('🗑️ Deleted.'); if (s.id === sessionId) startNew(); else loadSessions(); }
+                    else toast('❌ Failed.');
                 });
-
-                chatHistoryList.appendChild(div);
+                historyList.appendChild(el);
             });
-        } catch (e) { console.error('loadSessions:', e); }
+        } catch {}
     }
 
-    /* ═══════════════════════════════════════════
-       LOAD SESSION HISTORY
-    ════════════════════════════════════════════ */
-    async function loadSessionHistory(id) {
+    /* ══════════════════════════════════════════════
+       LOAD HISTORY
+    ═══════════════════════════════════════════════ */
+    async function loadHistory(id) {
         try {
             const r = await fetch(`/api/sessions/${id}`);
-            if (!r.ok) { startNewChat(); return; }
+            if (!r.ok) { startNew(); return; }
             const data = await r.json();
             if (welcomeScreen.parentNode) welcomeScreen.remove();
-            chatWindow.innerHTML = '';
-            data.history.forEach(m => appendMessage(m.sender, m.text, m.time));
-            if (data.model)       applyModelUI(data.model);
-            if (data.persona)     applyPersonaUI(data.persona);
+            chatView.innerHTML = '';
+            data.history.forEach(m => buildMessage(m.sender, m.text, m.time));
+            if (data.model)       applyModel(data.model);
+            if (data.persona)     applyPersona(data.persona);
             if (data.temperature != null) {
-                currentTemp = data.temperature;
-                tempSlider.value = currentTemp;
-                tempValueEl.textContent = parseFloat(currentTemp).toFixed(1);
+                curTemp = data.temperature; tempSlider.value = curTemp;
+                tempValueEl.textContent = parseFloat(curTemp).toFixed(1);
             }
-            scrollToBottom();
-        } catch (e) { console.error('loadSessionHistory:', e); }
+            scrollDown();
+        } catch {}
     }
 
-    /* ═══════════════════════════════════════════
+    /* ══════════════════════════════════════════════
        FAVORITES
-    ════════════════════════════════════════════ */
-    function getFavs()      { try { return JSON.parse(localStorage.getItem(FAV_KEY) || '[]'); } catch { return []; } }
-    function saveFavs(f)    { localStorage.setItem(FAV_KEY, JSON.stringify(f)); updateFavBadge(); }
-    function updateFavBadge() {
+    ═══════════════════════════════════════════════ */
+    function getFavs()   { try { return JSON.parse(localStorage.getItem(FAV) || '[]'); } catch { return []; } }
+    function setFavs(f)  { localStorage.setItem(FAV, JSON.stringify(f)); updateFavUI(); }
+    function isFaved(t)  { return getFavs().some(f => f.text === t); }
+    function updateFavUI() {
         const n = getFavs().length;
-        favCountEl.textContent    = n;
-        favCountEl.style.display  = n > 0 ? 'inline-flex' : 'none';
+        favDot.style.display   = n ? 'block' : 'none';
+        favCount.textContent   = n;
+        favCount.style.display = n ? 'inline-flex' : 'none';
     }
-    function isFaved(text)  { return getFavs().some(f => f.text === text); }
 
-    favoritesBtn.addEventListener('click',   () => { renderFavModal(); favoritesModal.style.display = 'flex'; });
-    favoritesClose.addEventListener('click', () => favoritesModal.style.display = 'none');
-    favoritesModal.addEventListener('click', e => { if (e.target === favoritesModal) favoritesModal.style.display = 'none'; });
+    function openFav() { renderFavModal(); favModal.style.display = 'flex'; }
+    favOpenBtn.addEventListener('click',    openFav);
+    favFromSettings.addEventListener('click', () => { closeSettings(); openFav(); });
+    favClose.addEventListener('click',      () => favModal.style.display = 'none');
+    favModal.addEventListener('click',      e => { if (e.target === favModal) favModal.style.display = 'none'; });
 
     function renderFavModal() {
-        const favs = getFavs();
-        favoritesList.innerHTML = '';
+        const favs = getFavs(); favList.innerHTML = '';
         if (!favs.length) {
-            favoritesList.innerHTML = `<div class="favorites-empty">
-                <i class="fa-regular fa-star"></i>
-                <p>No favorites yet.</p>
-                <span>Hover any message and click ⭐ Save to add it here.</span>
-            </div>`;
+            favList.innerHTML = `<div class="empty-state"><i class="fa-regular fa-star"></i><p>No favorites yet</p><span>Hover a message → click ⭐ Save</span></div>`;
             return;
         }
         favs.forEach((fav, idx) => {
-            const item = document.createElement('div');
-            item.className = 'fav-item';
-            item.innerHTML = `
-                <div class="fav-item-header">
-                    <span class="fav-item-sender ${fav.sender}">${fav.sender === 'user' ? '👤 You' : '⚡ Nova'}</span>
-                    <span class="fav-item-time">${fav.savedAt || ''}</span>
-                </div>
-                <div class="fav-item-text"></div>
-                <div class="fav-item-actions">
-                    <button class="fav-action-btn copy-fav"><i class="fa-regular fa-copy"></i> Copy</button>
-                    <button class="fav-action-btn remove"><i class="fa-solid fa-star-half-stroke"></i> Remove</button>
-                </div>`;
-            item.querySelector('.fav-item-text').textContent = fav.text;
-            item.querySelector('.copy-fav').addEventListener('click', () => {
-                navigator.clipboard.writeText(fav.text).then(() => showToast('✅ Copied!')).catch(() => showToast('❌ Failed.'));
+            const item = document.createElement('div'); item.className = 'fav-item';
+            item.innerHTML = `<div class="fav-header">
+                <span class="fav-sender ${fav.sender}">${fav.sender==='user'?'👤 You':'⚡ Nova'}</span>
+                <span class="fav-time">${fav.savedAt||''}</span>
+            </div><div class="fav-text"></div>
+            <div class="fav-actions">
+                <button class="fav-btn-sm copy"><i class="fa-regular fa-copy"></i> Copy</button>
+                <button class="fav-btn-sm rem"><i class="fa-solid fa-star-half-stroke"></i> Remove</button>
+            </div>`;
+            item.querySelector('.fav-text').textContent = fav.text;
+            item.querySelector('.copy').addEventListener('click', () => {
+                navigator.clipboard.writeText(fav.text).then(() => toast('✅ Copied!')).catch(() => toast('❌ Failed.'));
             });
-            item.querySelector('.remove').addEventListener('click', () => {
-                const updated = getFavs().filter((_, i) => i !== idx);
-                saveFavs(updated);
-                renderFavModal();
-                showToast('💔 Removed from favorites.');
-                // Update all star buttons matching this text
-                chatWindow.querySelectorAll('.fav-btn[data-text]').forEach(b => {
-                    if (b.dataset.text === fav.text) setStarState(b, false);
+            item.querySelector('.rem').addEventListener('click', () => {
+                const upd = getFavs().filter((_,i) => i !== idx);
+                setFavs(upd); renderFavModal(); toast('💔 Removed.');
+                chatView.querySelectorAll('.fav-btn[data-txt]').forEach(b => {
+                    if (b.dataset.txt === fav.text) setStarBtn(b, false);
                 });
             });
-            favoritesList.appendChild(item);
+            favList.appendChild(item);
         });
     }
 
     function makeFavBtn(text, sender) {
         const btn = document.createElement('button');
-        btn.className   = 'meta-btn fav-btn';
-        btn.dataset.text = text;
-        setStarState(btn, isFaved(text));
-
+        btn.className = 'meta-btn fav-btn'; btn.dataset.txt = text;
+        setStarBtn(btn, isFaved(text));
         btn.addEventListener('click', () => {
-            const current = getFavs();
-            const i       = current.findIndex(f => f.text === text);
-            if (i >= 0) {
-                current.splice(i, 1);
-                saveFavs(current);
-                setStarState(btn, false);
-                showToast('💔 Removed from favorites.');
-            } else {
-                current.unshift({ id: Date.now(), text, sender,
-                    savedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
-                saveFavs(current);
-                setStarState(btn, true);
-                showToast('⭐ Added to favorites!');
+            const cur = getFavs(); const i = cur.findIndex(f => f.text === text);
+            if (i >= 0) { cur.splice(i, 1); setFavs(cur); setStarBtn(btn, false); toast('💔 Removed.'); }
+            else {
+                cur.unshift({ id: Date.now(), text, sender,
+                    savedAt: new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }) });
+                setFavs(cur); setStarBtn(btn, true); toast('⭐ Saved!');
             }
         });
         return btn;
     }
-
-    function setStarState(btn, active) {
-        btn.classList.toggle('active', active);
-        btn.title    = active ? 'Remove from favorites' : 'Save to favorites';
-        btn.innerHTML = active
-            ? '<i class="fa-solid fa-star"></i> Saved'
-            : '<i class="fa-regular fa-star"></i> Save';
+    function setStarBtn(btn, on) {
+        btn.classList.toggle('active', on);
+        btn.title   = on ? 'Remove from favorites' : 'Save to favorites';
+        btn.innerHTML = on ? '<i class="fa-solid fa-star"></i>' : '<i class="fa-regular fa-star"></i>';
     }
 
-    /* ═══════════════════════════════════════════
-       SEND MESSAGE (Streaming SSE)
-    ════════════════════════════════════════════ */
-    async function sendMessage() {
-        const message = messageInput.value.trim();
-        if (!message || isWaiting) return;
-
-        if (welcomeScreen.parentNode === chatWindow) welcomeScreen.remove();
-        appendMessage('user', message);
-
-        messageInput.value = '';
-        messageInput.style.height = 'auto';
-        charCount.textContent = '0';
-        sendBtn.disabled = true;
-        isWaiting = true;
-        scrollToBottom();
-
-        const { container: aiContainer, bubble: aiBubble } = createStreamingBubble();
-        scrollToBottom();
-
-        try {
-            const resp = await fetch('/chat/stream', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message, session_id: sessionId, model: currentModel, persona: currentPersona, temperature: currentTemp }),
-            });
-
-            if (!resp.ok || !resp.body) throw new Error('Stream failed');
-
-            const reader  = resp.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = '', fullText = '';
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n');
-                buffer = lines.pop();
-
-                for (const line of lines) {
-                    if (!line.startsWith('data: ')) continue;
-                    try {
-                        const evt = JSON.parse(line.slice(6));
-                        if (evt.type === 'session') {
-                            sessionId = evt.session_id;
-                            sessionStorage.setItem('chat_session_id', sessionId);
-                        } else if (evt.type === 'chunk') {
-                            fullText += evt.text;
-                            aiBubble.innerHTML = typeof marked !== 'undefined'
-                                ? marked.parse(fullText)
-                                : fullText.replace(/\n/g, '<br>');
-                            const cur = document.createElement('span');
-                            cur.className = 'stream-cursor';
-                            aiBubble.appendChild(cur);
-                            scrollToBottom();
-                        } else if (evt.type === 'done') {
-                            if (typeof marked !== 'undefined') aiBubble.innerHTML = marked.parse(fullText);
-                            aiBubble.querySelectorAll('pre').forEach(addCopyCodeBtn);
-                            attachMeta(aiContainer, fullText, 'ai');
-                            loadSessions();
-                            scrollToBottom();
-                        } else if (evt.type === 'error') {
-                            aiBubble.textContent = '❌ Error: ' + evt.message;
-                        }
-                    } catch {}
-                }
-            }
-        } catch (err) {
-            console.error('Stream error:', err);
-            aiBubble.textContent = '❌ Error: Cannot reach server.';
-        } finally {
-            isWaiting = false;
-            sendBtn.disabled = !messageInput.value.trim();
-            messageInput.focus();
-        }
-    }
-
-    /* ═══════════════════════════════════════════
-       CREATE STREAMING BUBBLE (placeholder)
-    ════════════════════════════════════════════ */
-    function createStreamingBubble() {
-        const container = document.createElement('div');
-        container.className = 'message-container ai';
-
-        const row    = document.createElement('div');  row.className = 'message-row';
-        const avatar = document.createElement('div');  avatar.className = 'message-avatar';
-        avatar.innerHTML = '<i class="fa-solid fa-bolt"></i>';
-
-        const content = document.createElement('div'); content.className = 'message-content';
-        const bubble  = document.createElement('div'); bubble.className  = 'message-bubble';
-
-        const cursor  = document.createElement('span'); cursor.className = 'stream-cursor';
-        bubble.appendChild(cursor);
-
-        content.appendChild(bubble);
-        row.appendChild(avatar);
-        row.appendChild(content);
-        container.appendChild(row);
-        chatWindow.appendChild(container);
-
-        return { container, bubble };
-    }
-
-    /* ═══════════════════════════════════════════
-       APPEND MESSAGE (history / user)
-    ════════════════════════════════════════════ */
-    function appendMessage(sender, text, timeStr) {
-        const time      = timeStr || now();
-        const container = document.createElement('div');
-        container.className = `message-container ${sender}`;
-
-        const row    = document.createElement('div'); row.className = 'message-row';
-        const avatar = document.createElement('div'); avatar.className = 'message-avatar';
-        avatar.innerHTML = sender === 'user' ? '<i class="fa-solid fa-user"></i>' : '<i class="fa-solid fa-bolt"></i>';
-
-        const content = document.createElement('div'); content.className = 'message-content';
-        const bubble  = document.createElement('div'); bubble.className  = 'message-bubble';
+    /* ══════════════════════════════════════════════
+       BUILD MESSAGE
+    ═══════════════════════════════════════════════ */
+    function buildMessage(sender, text, t) {
+        const wrap = document.createElement('div'); wrap.className = `msg-wrap ${sender}`;
+        const row  = document.createElement('div'); row.className = 'msg-row';
+        const av   = document.createElement('div'); av.className = 'msg-avatar';
+        av.innerHTML = sender === 'user' ? '<i class="fa-solid fa-user"></i>' : '<i class="fa-solid fa-bolt"></i>';
+        const con  = document.createElement('div'); con.className = 'msg-content';
+        const bub  = document.createElement('div'); bub.className = 'msg-bubble';
 
         if (sender === 'ai' && typeof marked !== 'undefined') {
-            bubble.innerHTML = marked.parse(text);
-            bubble.querySelectorAll('pre').forEach(addCopyCodeBtn);
-        } else {
-            bubble.innerText = text;
-        }
+            bub.innerHTML = marked.parse(text);
+            bub.querySelectorAll('pre').forEach(addCodeCopy);
+        } else { bub.innerText = text; }
 
-        content.appendChild(bubble);
-        row.appendChild(avatar);
-        row.appendChild(content);
-        container.appendChild(row);
-        chatWindow.appendChild(container);
+        con.appendChild(bub);
+        row.appendChild(av); row.appendChild(con);
+        wrap.appendChild(row);
+        chatView.appendChild(wrap);
 
-        attachMeta(container, text, sender, time);
-        return container;
+        attachMeta(wrap, bub, text, sender, t);
+        return wrap;
     }
 
-    /* ═══════════════════════════════════════════
-       ATTACH META BUTTONS (copy, retry, fav)
-    ════════════════════════════════════════════ */
-    function attachMeta(container, text, sender, timeStr) {
-        // Remove old meta if exists
-        container.querySelector('.message-meta')?.remove();
-
-        const content  = container.querySelector('.message-content');
-        const meta     = document.createElement('div');
-        meta.className = 'message-meta';
-
-        // Time
-        const timeSpan = document.createElement('span');
-        timeSpan.className   = 'meta-time';
-        timeSpan.textContent = timeStr || now();
-        meta.appendChild(timeSpan);
+    function attachMeta(wrap, bub, text, sender, t) {
+        wrap.querySelector('.msg-meta')?.remove();
+        const meta = document.createElement('div'); meta.className = 'msg-meta';
+        const time = document.createElement('span'); time.className = 'meta-time';
+        time.textContent = t || now(); meta.appendChild(time);
 
         // Copy
-        meta.appendChild(makeBtn('<i class="fa-regular fa-copy"></i> Copy', () => {
-            const bubble = container.querySelector('.message-bubble');
-            navigator.clipboard.writeText(bubble.innerText)
-                .then(()  => showToast('✅ Copied!'))
-                .catch(()  => showToast('❌ Copy failed.'));
-        }));
+        const cpyBtn = document.createElement('button'); cpyBtn.className = 'meta-btn'; cpyBtn.innerHTML = '<i class="fa-regular fa-copy"></i>';
+        cpyBtn.title = 'Copy';
+        cpyBtn.addEventListener('click', () => navigator.clipboard.writeText(bub.innerText).then(() => toast('✅ Copied!')).catch(() => toast('❌ Failed.')));
+        meta.appendChild(cpyBtn);
 
         // Retry (AI only)
         if (sender === 'ai') {
-            meta.appendChild(makeBtn('<i class="fa-solid fa-rotate-right"></i> Retry', () => retryFromContainer(container)));
+            const retBtn = document.createElement('button'); retBtn.className = 'meta-btn'; retBtn.innerHTML = '<i class="fa-solid fa-rotate-right"></i>';
+            retBtn.title = 'Retry';
+            retBtn.addEventListener('click', () => retryMsg(wrap));
+            meta.appendChild(retBtn);
         }
 
-        // Favorite ⭐
+        // Favorite
         meta.appendChild(makeFavBtn(text, sender));
 
-        content.appendChild(meta);
+        wrap.querySelector('.msg-content').appendChild(meta);
     }
 
-    function makeBtn(html, onClick) {
-        const b = document.createElement('button');
-        b.className = 'meta-btn'; b.innerHTML = html;
-        b.addEventListener('click', onClick);
-        return b;
-    }
-    function now() { return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+    function now() { return new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }); }
 
-    /* ═══════════════════════════════════════════
-       RETRY
-    ════════════════════════════════════════════ */
-    async function retryFromContainer(aiContainer) {
-        const all  = [...chatWindow.querySelectorAll('.message-container')];
-        const idx  = all.indexOf(aiContainer);
-        let userText = null;
-        for (let i = idx - 1; i >= 0; i--) {
-            if (all[i].classList.contains('user')) { userText = all[i].querySelector('.message-bubble')?.innerText || null; break; }
-        }
-        if (!userText) { showToast('⚠️ No user message to retry.'); return; }
-        aiContainer.remove();
+    /* ══════════════════════════════════════════════
+       SEND MESSAGE (Streaming)
+    ═══════════════════════════════════════════════ */
+    async function sendMessage() {
+        const message = msgInput.value.trim();
+        if (!message || isWaiting) return;
+        if (welcomeScreen.parentNode === chatView) welcomeScreen.remove();
 
-        isWaiting = true; sendBtn.disabled = true;
-        const { container: newC, bubble: newB } = createStreamingBubble();
-        scrollToBottom();
+        buildMessage('user', message);
+        msgInput.value = ''; msgInput.style.height = 'auto';
+        charCount.textContent = '0'; sendBtn.disabled = true;
+        isWaiting = true; scrollDown();
+
+        const { wrap: aiWrap, bub: aiBub } = makeStreamBubble();
+        scrollDown();
 
         try {
             const resp = await fetch('/chat/stream', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: userText, session_id: sessionId, model: currentModel, persona: currentPersona, temperature: currentTemp }),
+                body: JSON.stringify({ message, session_id: sessionId, model: curModel, persona: curPersona, temperature: curTemp }),
             });
-            const reader = resp.body.getReader(); const decoder = new TextDecoder();
-            let buffer = '', fullText = '';
+            if (!resp.ok || !resp.body) throw new Error('stream fail');
+
+            const reader = resp.body.getReader(); const dec = new TextDecoder();
+            let buf = '', full = '';
 
             while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n'); buffer = lines.pop();
+                const { done, value } = await reader.read(); if (done) break;
+                buf += dec.decode(value, { stream: true });
+                const lines = buf.split('\n'); buf = lines.pop();
                 for (const line of lines) {
                     if (!line.startsWith('data: ')) continue;
                     try {
-                        const evt = JSON.parse(line.slice(6));
-                        if (evt.type === 'chunk') {
-                            fullText += evt.text;
-                            newB.innerHTML = typeof marked !== 'undefined' ? marked.parse(fullText) : fullText;
-                            const cur = document.createElement('span'); cur.className = 'stream-cursor'; newB.appendChild(cur);
-                            scrollToBottom();
-                        } else if (evt.type === 'done') {
-                            if (typeof marked !== 'undefined') newB.innerHTML = marked.parse(fullText);
-                            newB.querySelectorAll('pre').forEach(addCopyCodeBtn);
-                            attachMeta(newC, fullText, 'ai');
-                            scrollToBottom();
+                        const ev = JSON.parse(line.slice(6));
+                        if (ev.type === 'session') { sessionId = ev.session_id; sessionStorage.setItem('sid', sessionId); }
+                        else if (ev.type === 'chunk') {
+                            full += ev.text;
+                            aiBub.innerHTML = typeof marked !== 'undefined' ? marked.parse(full) : full;
+                            const cur = document.createElement('span'); cur.className = 'stream-cursor'; aiBub.appendChild(cur);
+                            scrollDown();
+                        } else if (ev.type === 'done') {
+                            if (typeof marked !== 'undefined') aiBub.innerHTML = marked.parse(full);
+                            aiBub.querySelectorAll('pre').forEach(addCodeCopy);
+                            attachMeta(aiWrap, aiBub, full, 'ai');
+                            loadSessions(); scrollDown();
+                        } else if (ev.type === 'error') {
+                            aiBub.textContent = '❌ ' + ev.message;
                         }
                     } catch {}
                 }
             }
-        } catch (e) { newB.textContent = '❌ Error: ' + e.message; }
-        finally { isWaiting = false; sendBtn.disabled = !messageInput.value.trim(); }
+        } catch (e) { aiBub.textContent = '❌ Cannot reach server.'; }
+        finally { isWaiting = false; sendBtn.disabled = !msgInput.value.trim(); msgInput.focus(); }
     }
 
-    /* ═══════════════════════════════════════════
-       COPY CODE BUTTON
-    ════════════════════════════════════════════ */
-    function addCopyCodeBtn(pre) {
-        if (pre.closest('.code-block-wrapper')) return;
-        const wrap = document.createElement('div');
-        wrap.className = 'code-block-wrapper';
-        pre.parentNode.insertBefore(wrap, pre);
-        wrap.appendChild(pre);
-        const btn = document.createElement('button');
-        btn.className = 'copy-code-btn';
+    function makeStreamBubble() {
+        const wrap = document.createElement('div'); wrap.className = 'msg-wrap ai';
+        const row  = document.createElement('div'); row.className = 'msg-row';
+        const av   = document.createElement('div'); av.className = 'msg-avatar'; av.innerHTML = '<i class="fa-solid fa-bolt"></i>';
+        const con  = document.createElement('div'); con.className = 'msg-content';
+        const bub  = document.createElement('div'); bub.className = 'msg-bubble';
+        const cur  = document.createElement('span'); cur.className = 'stream-cursor';
+        bub.appendChild(cur); con.appendChild(bub);
+        row.appendChild(av); row.appendChild(con); wrap.appendChild(row);
+        chatView.appendChild(wrap);
+        return { wrap, bub };
+    }
+
+    /* ══════════════════════════════════════════════
+       RETRY
+    ═══════════════════════════════════════════════ */
+    async function retryMsg(aiWrap) {
+        const all = [...chatView.querySelectorAll('.msg-wrap')]; const i = all.indexOf(aiWrap);
+        let userText = null;
+        for (let j = i - 1; j >= 0; j--) if (all[j].classList.contains('user')) { userText = all[j].querySelector('.msg-bubble')?.innerText || null; break; }
+        if (!userText) { toast('⚠️ No user message found.'); return; }
+        aiWrap.remove(); isWaiting = true; sendBtn.disabled = true;
+        const { wrap: nw, bub: nb } = makeStreamBubble(); scrollDown();
+        try {
+            const resp = await fetch('/chat/stream', {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({ message: userText, session_id: sessionId, model: curModel, persona: curPersona, temperature: curTemp })
+            });
+            const reader = resp.body.getReader(); const dec = new TextDecoder(); let buf = '', full = '';
+            while(true) {
+                const {done,value} = await reader.read(); if(done) break;
+                buf += dec.decode(value,{stream:true}); const lines = buf.split('\n'); buf = lines.pop();
+                for(const line of lines) {
+                    if(!line.startsWith('data: ')) continue;
+                    try {
+                        const ev = JSON.parse(line.slice(6));
+                        if(ev.type==='chunk') { full+=ev.text; nb.innerHTML=typeof marked!=='undefined'?marked.parse(full):full; const c=document.createElement('span');c.className='stream-cursor';nb.appendChild(c); scrollDown(); }
+                        else if(ev.type==='done') { if(typeof marked!=='undefined')nb.innerHTML=marked.parse(full); nb.querySelectorAll('pre').forEach(addCodeCopy); attachMeta(nw,nb,full,'ai'); scrollDown(); }
+                    } catch {}
+                }
+            }
+        } catch(e) { nb.textContent='❌ '+e.message; }
+        finally { isWaiting=false; sendBtn.disabled=!msgInput.value.trim(); }
+    }
+
+    /* ══════════════════════════════════════════════
+       CODE COPY
+    ═══════════════════════════════════════════════ */
+    function addCodeCopy(pre) {
+        if (pre.closest('.code-wrap')) return;
+        const wrap = document.createElement('div'); wrap.className = 'code-wrap';
+        pre.parentNode.insertBefore(wrap, pre); wrap.appendChild(pre);
+        const btn = document.createElement('button'); btn.className = 'code-copy-btn';
         btn.innerHTML = '<i class="fa-regular fa-copy"></i> Copy';
         btn.addEventListener('click', () => {
-            const code = (pre.querySelector('code') || pre).innerText;
-            navigator.clipboard.writeText(code).then(() => {
+            navigator.clipboard.writeText((pre.querySelector('code')||pre).innerText).then(() => {
                 btn.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
                 setTimeout(() => btn.innerHTML = '<i class="fa-regular fa-copy"></i> Copy', 2000);
             });
@@ -781,10 +601,6 @@ document.addEventListener('DOMContentLoaded', () => {
         wrap.appendChild(btn);
     }
 
-    /* ── Global for welcome screen onclick ── */
-    window.submitSuggested = (txt) => {
-        messageInput.value = txt;
-        messageInput.dispatchEvent(new Event('input'));
-        sendMessage();
-    };
+    /* Global for welcome screen suggestions */
+    window.submitSuggested = txt => { msgInput.value = txt; msgInput.dispatchEvent(new Event('input')); sendMessage(); };
 });
