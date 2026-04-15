@@ -1,9 +1,11 @@
 import os
 import uuid
 import json
+import mimetypes
 from datetime import datetime
 from flask import Flask, request, jsonify, render_template, Response, stream_with_context
 from google import genai
+from google.genai import types
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -238,6 +240,125 @@ def chat_stream():
             "Cache-Control":   "no-cache",
             "X-Accel-Buffering": "no",
         }
+    )
+
+# ── Allowed file types ─────────────────────────────────
+ALLOWED_IMAGE_TYPES = {'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif'}
+ALLOWED_TEXT_EXTS   = {'.txt', '.md', '.csv', '.json', '.py', '.js', '.ts', '.html', '.css', '.xml', '.yaml', '.yml'}
+ALLOWED_DOC_TYPES   = {'application/pdf'}
+MAX_FILE_MB         = 10
+
+@app.route("/chat/upload", methods=["POST"])
+def chat_upload():
+    """Multimodal chat: accepts a file (image/text/pdf) + message."""
+    if not client:
+        def err():
+            yield f"data: {json.dumps({'type':'error','message':'Gemini not initialized'})}\n\n"
+        return Response(err(), mimetype="text/event-stream")
+
+    message     = request.form.get("message",    "").strip()
+    session_id  = request.form.get("session_id", "")
+    model       = request.form.get("model",      DEFAULT_MODEL)
+    persona     = request.form.get("persona",    "assistant")
+    temperature = float(request.form.get("temperature", 0.7))
+    uploaded    = request.files.get("file")
+
+    if model not in ALLOWED_MODELS:
+        model = DEFAULT_MODEL
+
+    if not uploaded:
+        def err():
+            yield f"data: {json.dumps({'type':'error','message':'No file provided'})}\n\n"
+        return Response(err(), mimetype="text/event-stream")
+
+    # ── Read file ──────────────────────────────────────
+    filename  = uploaded.filename or "file"
+    ext       = os.path.splitext(filename)[1].lower()
+    mime_type = uploaded.content_type or mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    file_bytes = uploaded.read()
+
+    if len(file_bytes) > MAX_FILE_MB * 1024 * 1024:
+        def err():
+            yield f"data: {json.dumps({'type':'error','message':f'File too large (max {MAX_FILE_MB}MB)'})}\n\n"
+        return Response(err(), mimetype="text/event-stream")
+
+    # ── Build content parts ────────────────────────────
+    parts = []
+    file_label = ""
+
+    if mime_type in ALLOWED_IMAGE_TYPES:
+        # Image → send as bytes part for Gemini Vision
+        parts.append(types.Part.from_bytes(data=file_bytes, mime_type=mime_type))
+        file_label = f"[Image: {filename}]"
+        if not message:
+            message = "Please describe this image in detail."
+
+    elif mime_type in ALLOWED_DOC_TYPES or ext == ".pdf":
+        # PDF → send as bytes part
+        parts.append(types.Part.from_bytes(data=file_bytes, mime_type="application/pdf"))
+        file_label = f"[PDF: {filename}]"
+        if not message:
+            message = "Please summarize the content of this PDF."
+
+    elif ext in ALLOWED_TEXT_EXTS:
+        # Text file → read as UTF-8 and prepend to message
+        try:
+            text_content = file_bytes.decode("utf-8", errors="replace")
+            parts = []  # no binary part needed
+            if not message:
+                message = f"Here is the content of `{filename}`:\n\n```\n{text_content}\n```\n\nPlease analyze it."
+            else:
+                message = f"Here is the content of `{filename}`:\n\n```\n{text_content}\n```\n\n{message}"
+            file_label = f"[File: {filename}]"
+        except Exception as e:
+            def err():
+                yield f"data: {json.dumps({'type':'error','message':'Cannot read file: ' + str(e)})}\n\n"
+            return Response(err(), mimetype="text/event-stream")
+    else:
+        def err():
+            yield f"data: {json.dumps({'type':'error','message':'Unsupported file type: ' + mime_type})}\n\n"
+        return Response(err(), mimetype="text/event-stream")
+
+    # Add text message to parts
+    if message:
+        parts.append(message)
+
+    # ── Session management ─────────────────────────────
+    if _needs_new_session(session_id, model, persona, temperature):
+        old_hist  = chat_sessions.get(session_id, {}).get("history", []) if session_id else []
+        session_id = _create_session(model, persona, temperature, old_hist)
+
+    session_data = chat_sessions[session_id]
+    now = datetime.now().strftime("%H:%M")
+
+    # Build user-facing history text
+    user_display = f"{file_label} {message}".strip()
+    if not any(h["sender"] == "user" for h in session_data["history"]):
+        session_data["title"] = (user_display[:30] + "...") if len(user_display) > 30 else user_display
+
+    session_data["history"].append({"sender": "user", "text": user_display, "time": now})
+
+    def stream_file():
+        full = []
+        try:
+            yield f"data: {json.dumps({'type':'session','session_id':session_id,'title':session_data['title']})}\n\n"
+            for chunk in session_data["chat"].send_message_stream(parts):
+                if chunk.text:
+                    full.append(chunk.text)
+                    yield f"data: {json.dumps({'type':'chunk','text':chunk.text})}\n\n"
+            complete = "".join(full)
+            session_data["history"].append({"sender": "ai", "text": complete, "time": now})
+            yield f"data: {json.dumps({'type':'done'})}\n\n"
+        except Exception as e:
+            if session_data["history"] and session_data["history"][-1]["sender"] == "user":
+                session_data["history"].pop()
+            print(f"Upload stream error: {e}")
+            yield f"data: {json.dumps({'type':'error','message':str(e)})}\n\n"
+
+    return Response(
+        stream_with_context(stream_file()),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
 
 # ── Sessions API ──────────────────────────────────────

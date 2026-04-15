@@ -45,6 +45,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const favClose       = document.getElementById('favorites-close');
     const favList        = document.getElementById('favorites-list');
 
+    // File upload
+    const attachBtn      = document.getElementById('attach-btn');
+    const fileInput      = document.getElementById('file-input');
+    const filePreview    = document.getElementById('file-preview');
+    const filePreviewIn  = document.getElementById('file-preview-inner');
+    const fileClearBtn   = document.getElementById('file-clear-btn');
+
     /* ── State ─────────────────────────────────────── */
     let sessionId     = sessionStorage.getItem('sid') || null;
     let isWaiting     = false;
@@ -55,6 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let recognition   = null;
     let isRecording   = false;
     const FAV         = 'nova-favs';
+    let   attachedFile = null;   // File object currently attached
 
     /* ── Init ──────────────────────────────────────── */
     sendBtn.disabled = true;
@@ -484,26 +492,46 @@ document.addEventListener('DOMContentLoaded', () => {
     function now() { return new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }); }
 
     /* ══════════════════════════════════════════════
-       SEND MESSAGE (Streaming)
+       SEND MESSAGE (Streaming / Upload)
     ═══════════════════════════════════════════════ */
     async function sendMessage() {
         const message = msgInput.value.trim();
-        if (!message || isWaiting) return;
+        if ((!message && !attachedFile) || isWaiting) return;
         if (welcomeScreen.parentNode === chatView) welcomeScreen.remove();
 
-        buildMessage('user', message);
+        const f = attachedFile;
+        // Build user text showing file name if present
+        const userDisplay = f ? `[File: ${f.name}] ${message}`.trim() : message;
+
+        buildMessage('user', userDisplay);
         msgInput.value = ''; msgInput.style.height = 'auto';
         charCount.textContent = '0'; sendBtn.disabled = true;
-        isWaiting = true; scrollDown();
+        isWaiting = true; clearAttachment(); scrollDown();
 
         const { wrap: aiWrap, bub: aiBub } = makeStreamBubble();
         scrollDown();
 
         try {
-            const resp = await fetch('/chat/stream', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message, session_id: sessionId, model: curModel, persona: curPersona, temperature: curTemp }),
-            });
+            let resp;
+            if (f) {
+                // Multimodal upload
+                const fd = new FormData();
+                fd.append('file', f);
+                fd.append('message', message);
+                if (sessionId) fd.append('session_id', sessionId);
+                fd.append('model', curModel);
+                fd.append('persona', curPersona);
+                fd.append('temperature', curTemp);
+
+                resp = await fetch('/chat/upload', { method: 'POST', body: fd });
+            } else {
+                // Text only
+                resp = await fetch('/chat/stream', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message, session_id: sessionId, model: curModel, persona: curPersona, temperature: curTemp }),
+                });
+            }
+
             if (!resp.ok || !resp.body) throw new Error('stream fail');
 
             const reader = resp.body.getReader(); const dec = new TextDecoder();
@@ -535,7 +563,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         } catch (e) { aiBub.textContent = '❌ Cannot reach server.'; }
-        finally { isWaiting = false; sendBtn.disabled = !msgInput.value.trim(); msgInput.focus(); }
+        finally { isWaiting = false; sendBtn.disabled = (!msgInput.value.trim() && !attachedFile); msgInput.focus(); }
     }
 
     function makeStreamBubble() {
@@ -599,6 +627,60 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
         wrap.appendChild(btn);
+    }
+
+    /* ══════════════════════════════════════════════
+       FILE UPLOAD (Attach)
+    ═══════════════════════════════════════════════ */
+    attachBtn.addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', () => {
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        // Check size (max 10MB)
+        if (file.size > 10 * 1024 * 1024) {
+            toast('❌ File is too large (Max 10MB).');
+            fileInput.value = '';
+            return;
+        }
+
+        attachedFile = file;
+        renderFilePreview(file);
+        attachBtn.classList.add('has-file');
+        sendBtn.disabled = false;
+        msgInput.focus();
+    });
+
+    fileClearBtn.addEventListener('click', clearAttachment);
+
+    function clearAttachment() {
+        attachedFile = null;
+        fileInput.value = '';
+        filePreview.style.display = 'none';
+        filePreviewIn.innerHTML = '';
+        attachBtn.classList.remove('has-file');
+        sendBtn.disabled = (!msgInput.value.trim() && !isWaiting);
+    }
+
+    function renderFilePreview(file) {
+        filePreviewIn.innerHTML = '';
+        filePreview.style.display = 'flex';
+
+        if (file.type.startsWith('image/')) {
+            const img = document.createElement('img');
+            img.src = URL.createObjectURL(file);
+            filePreviewIn.appendChild(img);
+        } else {
+            const chip = document.createElement('div');
+            chip.className = 'file-chip';
+            chip.innerHTML = `<i class="fa-solid fa-file${file.type==='application/pdf'?'-pdf':'-lines'}"></i>
+                              <div>
+                                  <div class="file-chip-name">${file.name}</div>
+                                  <div class="file-chip-size">${(file.size/1024).toFixed(1)} KB</div>
+                              </div>`;
+            filePreviewIn.appendChild(chip);
+        }
     }
 
     /* Global for welcome screen suggestions */

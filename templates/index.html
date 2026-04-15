@@ -87,10 +87,17 @@
 
             <!-- Input -->
             <div class="input-area">
+                <!-- File Preview -->
+                <div class="file-preview" id="file-preview" style="display:none">
+                    <div class="file-preview-inner" id="file-preview-inner"></div>
+                    <button class="file-clear-btn" id="file-clear-btn" title="Remove file"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+
                 <div class="input-box">
                     <textarea id="message-input" placeholder="Message Nova…" rows="1"></textarea>
                     <div class="input-row">
                         <div class="input-left">
+                            <button class="icon-btn sm" id="attach-btn" title="Attach file or image"><i class="fa-solid fa-paperclip"></i></button>
                             <button class="icon-btn sm" id="voice-btn" title="Voice input"><i class="fa-solid fa-microphone"></i></button>
                             <button class="icon-btn sm" id="browse-prompts-btn" title="Prompt library"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
                         </div>
@@ -102,6 +109,7 @@
                         </div>
                     </div>
                 </div>
+                <input type="file" id="file-input" accept="image/*,.pdf,.txt,.md,.csv,.json,.py,.js,.ts,.html,.css,.xml,.yaml,.yml" style="display:none">
                 <div class="input-disclaimer">Nova AI may make mistakes. Powered by Google Gemini.</div>
             </div>
         </div>
