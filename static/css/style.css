@@ -522,6 +522,23 @@ textarea::placeholder { color:var(--tx-3); }
     box-shadow:0 2px 6px var(--glow); cursor:pointer;
 }
 
+/* Select Box */
+.sp-select {
+    width: 100%; padding: 9px 12px;
+    background: var(--bg); border: 1.5px solid var(--border);
+    border-radius: var(--r-md); color: var(--tx-2);
+    font-family: inherit; font-size: .85rem; font-weight: 500;
+    cursor: pointer; outline: none; transition: all .18s;
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237878a0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 14px;
+}
+.sp-select:hover { border-color: var(--border-f); color: var(--tx); }
+.sp-select:focus { border-color: var(--purple); color: var(--tx); box-shadow: 0 0 0 3px rgba(124,92,252,.1); }
+.sp-select option { background: var(--bg-el); color: var(--tx); }
+
 /* Settings actions */
 .sp-actions { display:flex; flex-direction:column; gap:6px; }
 .sp-action-btn {

@@ -80,11 +80,16 @@ def index():
     return render_template("index.html")
 
 # ── Helper: create session ────────────────────────────
-def _create_session(model, persona, temperature, old_history=None):
+def _create_session(model, persona, temperature, language="auto", old_history=None):
     sid    = str(uuid.uuid4())
     p_data = PERSONAS.get(persona, PERSONAS["assistant"])
+    
+    instruction = p_data["instruction"]
+    if language != "auto":
+        instruction += f"\n\nCRITICAL INSTRUCTION: You MUST respond in the {language} language, regardless of the language the user uses."
+
     config = {
-        "system_instruction": p_data["instruction"],
+        "system_instruction": instruction,
         "temperature": float(temperature),
     }
     chat_sessions[sid] = {
@@ -94,16 +99,19 @@ def _create_session(model, persona, temperature, old_history=None):
         "model":       model,
         "persona":     persona,
         "temperature": float(temperature),
+        "language":    language,
     }
     return sid
 
-def _needs_new_session(session_id, model, persona, temperature):
+def _needs_new_session(session_id, model, persona, temperature, language="auto"):
     existing = chat_sessions.get(session_id) if session_id else None
     if existing is None:
         return True
     if existing.get("model") != model:
         return True
     if existing.get("persona") != persona:
+        return True
+    if existing.get("language", "auto") != language:
         return True
     return False
 
@@ -167,6 +175,7 @@ def chat_stream():
     model       = data.get("model", DEFAULT_MODEL)
     persona     = data.get("persona", "assistant")
     temperature = float(data.get("temperature", 0.7))
+    language    = data.get("language", "auto")
 
     if model not in ALLOWED_MODELS:
         model = DEFAULT_MODEL
@@ -176,9 +185,9 @@ def chat_stream():
             yield f"data: {json.dumps({'type':'error','message':'Message required'})}\n\n"
         return Response(err(), mimetype="text/event-stream")
 
-    if _needs_new_session(session_id, model, persona, temperature):
+    if _needs_new_session(session_id, model, persona, temperature, language):
         old_history = chat_sessions.get(session_id, {}).get("history", []) if session_id else []
-        session_id  = _create_session(model, persona, temperature, old_history)
+        session_id  = _create_session(model, persona, temperature, language, old_history)
 
     session_data = chat_sessions[session_id]
     now = datetime.now().strftime("%H:%M")
@@ -261,6 +270,7 @@ def chat_upload():
     model       = request.form.get("model",      DEFAULT_MODEL)
     persona     = request.form.get("persona",    "assistant")
     temperature = float(request.form.get("temperature", 0.7))
+    language    = request.form.get("language",   "auto")
     uploaded    = request.files.get("file")
 
     if model not in ALLOWED_MODELS:
@@ -324,9 +334,9 @@ def chat_upload():
         parts.append(message)
 
     # ── Session management ─────────────────────────────
-    if _needs_new_session(session_id, model, persona, temperature):
+    if _needs_new_session(session_id, model, persona, temperature, language):
         old_hist  = chat_sessions.get(session_id, {}).get("history", []) if session_id else []
-        session_id = _create_session(model, persona, temperature, old_hist)
+        session_id = _create_session(model, persona, temperature, language, old_hist)
 
     session_data = chat_sessions[session_id]
     now = datetime.now().strftime("%H:%M")

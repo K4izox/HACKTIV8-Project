@@ -44,6 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const favModal       = document.getElementById('favorites-modal');
     const favClose       = document.getElementById('favorites-close');
     const favList        = document.getElementById('favorites-list');
+    const langSelect     = document.getElementById('language-select');
 
     // File upload
     const attachBtn      = document.getElementById('attach-btn');
@@ -58,6 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let curModel      = localStorage.getItem('nova-model')   || 'gemini-2.5-flash';
     let curPersona    = localStorage.getItem('nova-persona') || 'assistant';
     let curTemp       = parseFloat(localStorage.getItem('nova-temp') || '0.7');
+    let curLang       = localStorage.getItem('nova-lang') || 'auto';
     let renameTarget  = null;
     let recognition   = null;
     let isRecording   = false;
@@ -70,6 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
     applyPersona(curPersona);
     tempSlider.value = curTemp;
     tempValueEl.textContent = curTemp.toFixed(1);
+    langSelect.value = curLang;
     updateFavUI();
     initVoice();
     if (sessionId) loadHistory(sessionId);
@@ -157,6 +160,15 @@ document.addEventListener('DOMContentLoaded', () => {
         curTemp = parseFloat(tempSlider.value);
         tempValueEl.textContent = curTemp.toFixed(1);
         localStorage.setItem('nova-temp', curTemp);
+    });
+
+    /* ══════════════════════════════════════════════
+       LANGUAGE
+    ═══════════════════════════════════════════════ */
+    langSelect.addEventListener('change', () => {
+        curLang = langSelect.value;
+        localStorage.setItem('nova-lang', curLang);
+        toast('🌐 Language: ' + langSelect.options[langSelect.selectedIndex].text);
     });
 
     /* ══════════════════════════════════════════════
@@ -522,13 +534,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 fd.append('model', curModel);
                 fd.append('persona', curPersona);
                 fd.append('temperature', curTemp);
+                fd.append('language', curLang);
 
                 resp = await fetch('/chat/upload', { method: 'POST', body: fd });
             } else {
                 // Text only
                 resp = await fetch('/chat/stream', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message, session_id: sessionId, model: curModel, persona: curPersona, temperature: curTemp }),
+                    body: JSON.stringify({ message, session_id: sessionId, model: curModel, persona: curPersona, temperature: curTemp, language: curLang }),
                 });
             }
 
@@ -592,7 +605,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const resp = await fetch('/chat/stream', {
                 method:'POST', headers:{'Content-Type':'application/json'},
-                body: JSON.stringify({ message: userText, session_id: sessionId, model: curModel, persona: curPersona, temperature: curTemp })
+                body: JSON.stringify({ message: userText, session_id: sessionId, model: curModel, persona: curPersona, temperature: curTemp, language: curLang })
             });
             const reader = resp.body.getReader(); const dec = new TextDecoder(); let buf = '', full = '';
             while(true) {
