@@ -63,6 +63,9 @@
                     <button class="footer-btn" id="export-btn" title="Export Chat">
                         <i class="fa-solid fa-download"></i><span>Export</span>
                     </button>
+                    <button class="footer-btn" id="favorites-btn" title="Favorites">
+                        <i class="fa-solid fa-star"></i><span>Favorites <span id="fav-count" class="fav-badge" style="display:none">0</span></span>
+                    </button>
                     <button class="footer-btn" id="clear-all-btn" title="Clear All History">
                         <i class="fa-solid fa-trash"></i><span>Clear All</span>
                     </button>
@@ -237,6 +240,23 @@
                 </div>
                 <div class="prompt-card" data-prompt="Give me 10 creative blog post ideas about technology.">
                     <i class="fa-solid fa-lightbulb"></i><h4>Creative Ideas</h4><p>10 creative tech blog ideas…</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Favorites Modal -->
+    <div class="modal-overlay" id="favorites-modal" style="display:none;">
+        <div class="modal favorites-modal">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-star"></i> Favorite Messages</h3>
+                <button id="favorites-close" class="close-btn"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="favorites-list" class="favorites-list">
+                <div class="favorites-empty">
+                    <i class="fa-regular fa-star"></i>
+                    <p>No favorites yet.</p>
+                    <span>Click the ⭐ star on any message to save it here.</span>
                 </div>
             </div>
         </div>

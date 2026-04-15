@@ -789,6 +789,173 @@ document.addEventListener('DOMContentLoaded', () => {
         chatWindow.scrollTo({ top: chatWindow.scrollHeight, behavior: 'smooth' });
     }
 
+    /* ═══════════════════════════════════════════════
+       ⭐ FAVORITES SYSTEM
+    ════════════════════════════════════════════════ */
+    const FAV_KEY = 'nova-favorites';
+    const favModal     = document.getElementById('favorites-modal');
+    const favList      = document.getElementById('favorites-list');
+    const favClose     = document.getElementById('favorites-close');
+    const favBtn       = document.getElementById('favorites-btn');
+    const favCountEl   = document.getElementById('fav-count');
+
+    function getFavorites() {
+        try { return JSON.parse(localStorage.getItem(FAV_KEY) || '[]'); }
+        catch { return []; }
+    }
+    function saveFavorites(favs) {
+        localStorage.setItem(FAV_KEY, JSON.stringify(favs));
+        updateFavBadge();
+    }
+    function updateFavBadge() {
+        const count = getFavorites().length;
+        if (count > 0) {
+            favCountEl.textContent = count;
+            favCountEl.style.display = 'inline-flex';
+        } else {
+            favCountEl.style.display = 'none';
+        }
+    }
+
+    /* Open / close favorites modal */
+    favBtn.addEventListener('click', () => {
+        renderFavoritesModal();
+        favModal.style.display = 'flex';
+    });
+    favClose.addEventListener('click', () => favModal.style.display = 'none');
+    favModal.addEventListener('click', (e) => { if (e.target === favModal) favModal.style.display = 'none'; });
+
+    /* Render modal contents */
+    function renderFavoritesModal() {
+        const favs = getFavorites();
+        favList.innerHTML = '';
+
+        if (!favs.length) {
+            favList.innerHTML = `
+                <div class="favorites-empty">
+                    <i class="fa-regular fa-star"></i>
+                    <p>No favorites yet.</p>
+                    <span>Click the ⭐ star on any message to save it here.</span>
+                </div>`;
+            return;
+        }
+
+        favs.forEach((fav, idx) => {
+            const item = document.createElement('div');
+            item.className = 'fav-item';
+            item.innerHTML = `
+                <div class="fav-item-header">
+                    <span class="fav-item-sender ${fav.sender}">${fav.sender === 'user' ? '👤 You' : '⚡ Nova'}</span>
+                    <span class="fav-item-time">${fav.savedAt}</span>
+                </div>
+                <div class="fav-item-text"></div>
+                <div class="fav-item-actions">
+                    <button class="fav-action-btn copy-fav"><i class="fa-regular fa-copy"></i> Copy</button>
+                    <button class="fav-action-btn remove"><i class="fa-solid fa-star-half-stroke"></i> Remove</button>
+                </div>
+            `;
+            item.querySelector('.fav-item-text').textContent = fav.text;
+
+            // Copy
+            item.querySelector('.copy-fav').addEventListener('click', () => {
+                navigator.clipboard.writeText(fav.text)
+                    .then(() => showToast('✅ Copied!'))
+                    .catch(() => showToast('❌ Copy failed.'));
+            });
+
+            // Remove
+            item.querySelector('.remove').addEventListener('click', () => {
+                const updated = getFavorites().filter((_, i) => i !== idx);
+                saveFavorites(updated);
+                renderFavoritesModal();
+                showToast('🗑️ Removed from favorites.');
+            });
+
+            favList.appendChild(item);
+        });
+    }
+
+    /* Add a star ⭐ button to message meta */
+    function makeFavBtn(text, sender) {
+        const favs = getFavorites();
+        const alreadySaved = favs.some(f => f.text === text);
+
+        const btn = document.createElement('button');
+        btn.className = 'meta-btn fav-btn' + (alreadySaved ? ' active' : '');
+        btn.title = alreadySaved ? 'Remove from favorites' : 'Add to favorites';
+        btn.innerHTML = alreadySaved
+            ? '<i class="fa-solid fa-star"></i> Saved'
+            : '<i class="fa-regular fa-star"></i> Save';
+
+        btn.addEventListener('click', () => {
+            const current = getFavorites();
+            const existIdx = current.findIndex(f => f.text === text);
+
+            if (existIdx >= 0) {
+                // Remove
+                current.splice(existIdx, 1);
+                saveFavorites(current);
+                btn.className = 'meta-btn fav-btn';
+                btn.title     = 'Add to favorites';
+                btn.innerHTML = '<i class="fa-regular fa-star"></i> Save';
+                showToast('💔 Removed from favorites.');
+            } else {
+                // Add
+                current.unshift({
+                    id:      Date.now(),
+                    text,
+                    sender,
+                    savedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                });
+                saveFavorites(current);
+                btn.className = 'meta-btn fav-btn active';
+                btn.title     = 'Remove from favorites';
+                btn.innerHTML = '<i class="fa-solid fa-star"></i> Saved';
+                showToast('⭐ Added to favorites!');
+            }
+        });
+
+        return btn;
+    }
+
+    /* Patch makeMetaBtn callers to include star button.
+       Override finalizeStreamedMessage & appendMessage to inject fav btn. */
+    const _origFinalize = finalizeStreamedMessage;
+    // We'll just call makeFavBtn directly inside the existing functions below.
+    // Init badge on load
+    updateFavBadge();
+
+    /* Expose makeFavBtn so appendMessage / finalizeStreamedMessage can use it */
+    window._makeFavBtn = makeFavBtn;
+
+    /* ── Patch appendMessage to include fav button ─────────── */
+    // We override the meta creation — done inline in the patched version below.
+    // (The function is already defined above; we patch via the meta-building
+    //  section using a second pass on newly created containers.)
+
+    // Observe new message-containers added to chatWindow and inject fav btn
+    const metaObserver = new MutationObserver((mutations) => {
+        mutations.forEach(m => {
+            m.addedNodes.forEach(node => {
+                if (!(node instanceof HTMLElement)) return;
+                const containers = node.classList?.contains('message-container')
+                    ? [node]
+                    : [...node.querySelectorAll('.message-container')];
+
+                containers.forEach(container => {
+                    const meta = container.querySelector('.message-meta');
+                    if (!meta || meta.querySelector('.fav-btn')) return; // already has star
+
+                    const bubble = container.querySelector('.message-bubble');
+                    const text   = bubble?.innerText || '';
+                    const sender = container.classList.contains('user') ? 'user' : 'ai';
+                    meta.appendChild(makeFavBtn(text, sender));
+                });
+            });
+        });
+    });
+    metaObserver.observe(chatWindow, { childList: true, subtree: true });
+
     /* Global for inline onclick */
     window.submitSuggested = (txt) => {
         messageInput.value = txt;
