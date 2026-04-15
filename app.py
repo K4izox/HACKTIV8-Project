@@ -217,28 +217,6 @@ def chat_stream():
 
     session_data["history"].append({"sender": "user", "text": message, "time": now})
 
-    def generate():
-        full_reply = ""
-        try:
-            # First, yield session metadata
-            yield f"data: {json.dumps({'type':'session','session_id':session_id,'title':session_data['title']})}\n\n"
-
-            # Stream chunks from Gemini
-            for chunk in session_data["chat"].send_message_stream(message):
-                if chunk.text:
-                    full_reply_local = chunk.text
-                    yield f"data: {json.dumps({'type':'chunk','text':full_reply_local})}\n\n"
-                    # accumulate
-            # We can't easily accumulate outside due to generator scope,
-            # so we'll store after streaming via a closure trick
-
-            yield f"data: {json.dumps({'type':'done'})}\n\n"
-
-        except Exception as e:
-            # Remove the user message we added
-            if session_data["history"] and session_data["history"][-1]["sender"] == "user":
-                session_data["history"].pop()
-            yield f"data: {json.dumps({'type':'error','message':str(e)})}\n\n"
 
     # We need to collect the full reply to store in history.
     # Use a wrapper that intercepts chunks.
@@ -262,7 +240,7 @@ def chat_stream():
                     return f"\n\n![Generated Image]({img_url})\n\n"
                 return "\n\n*(Failed to generate image)*\n\n"
             
-            complete = re.sub(r'IMAGE_GEN\((.*?)\)', replace_img_gen, complete)
+            complete = re.sub(r'IMAGE_GEN\((.*?)\)', replace_img_gen, complete, flags=re.DOTALL)
 
             session_data["history"].append({"sender": "ai", "text": complete, "time": now})
             
@@ -399,7 +377,7 @@ def chat_upload():
                 img_url = generate_image_internal(prompt)
                 if img_url: return f"\n\n![Generated Image]({img_url})\n\n"
                 return "\n\n*(Failed to generate image)*\n\n"
-            complete = re.sub(r'IMAGE_GEN\((.*?)\)', replace_img_gen, complete)
+            complete = re.sub(r'IMAGE_GEN\((.*?)\)', replace_img_gen, complete, flags=re.DOTALL)
             session_data["history"].append({"sender": "ai", "text": complete, "time": now})
             yield f"data: {json.dumps({'type':'final_processed','text':complete})}\n\n"
             yield f"data: {json.dumps({'type':'done'})}\n\n"
