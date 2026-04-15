@@ -45,12 +45,13 @@ def generate_image_internal(prompt):
         
         # Using Pollinations AI as a highly reliable and fast fallback for this project
         seed = random.randint(1, 1000000)
-        # Clean up prompt: remove newlines and extra spaces
         clean_prompt = re.sub(r'\s+', ' ', prompt).strip()
         encoded_prompt = urllib.parse.quote(clean_prompt)
-        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true&seed={seed}"
-        print(f"Generated URL: {url}")
-        return url
+        raw_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true&seed={seed}"
+        # Use our local proxy to ensure the image always loads and avoids browser/network issues
+        proxy_url = f"/api/image-proxy?url={urllib.parse.quote(raw_url)}"
+        print(f"Proxied URL: {proxy_url}")
+        return proxy_url
     except Exception as e:
         print(f"Image gen error: {e}")
         return None
@@ -443,6 +444,16 @@ def rename_session(session_id):
 @app.route("/api/personas", methods=["GET"])
 def get_personas():
     return jsonify({"personas": {k: v["name"] for k, v in PERSONAS.items()}})
+
+@app.route("/api/image-proxy")
+def image_proxy():
+    url = request.args.get("url")
+    if not url: return "URL missing", 400
+    try:
+        r = requests.get(url, stream=True, timeout=10)
+        return Response(r.content, content_type=r.headers.get('Content-Type', 'image/jpeg'))
+    except Exception as e:
+        return str(e), 500
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
