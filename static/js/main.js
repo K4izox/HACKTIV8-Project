@@ -73,6 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
     tempSlider.value = curTemp;
     tempValueEl.textContent = curTemp.toFixed(1);
     langSelect.value = curLang;
+    applyLanguage(curLang); // Initialize UI translations
     updateFavUI();
     initVoice();
     if (sessionId) loadHistory(sessionId);
@@ -163,12 +164,212 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     /* ══════════════════════════════════════════════
-       LANGUAGE
+       LANGUAGE (UI TRANSLATION)
     ═══════════════════════════════════════════════ */
+    const translations = {
+        'id': {
+            'new-chat': '<i class="fa-solid fa-plus"></i> Chat Baru',
+            'recents': 'Terkini',
+            'search-ph': 'Cari pesan…',
+            'welcome-desc': 'Asisten AI cerdas Anda. Tanyakan apa saja.',
+            'sug-1': '<i class="fa-solid fa-brain"></i> Jelaskan ML sederhana',
+            'sug-2': '<i class="fa-brands fa-python"></i> Snippet Python',
+            'sug-3': '<i class="fa-solid fa-bolt"></i> Tips produktivitas',
+            'sug-4': '<i class="fa-solid fa-pen-nib"></i> Ide cerita kreatif',
+            'input-ph': 'Pesan ke Nova…',
+            'disclaimer': 'Nova AI bisa saja berbuat salah. Didukung oleh Google Gemini.',
+            'settings-title': 'Pengaturan',
+            'sp-model': 'Model',
+            'sp-persona': 'Persona',
+            'sp-temp': 'Kreativitas',
+            'temp-1': 'Tepat',
+            'temp-2': 'Kreatif',
+            'sp-lang': 'Bahasa',
+            'sp-actions': 'Aksi',
+            'btn-export': '<i class="fa-solid fa-download"></i> Ekspor Chat',
+            'btn-fav': '<i class="fa-solid fa-star"></i> Favorit ',
+            'btn-clear': '<i class="fa-solid fa-trash"></i> Hapus Semua',
+            'modal-rename': '<i class="fa-solid fa-pencil"></i> Ubah Nama Chat',
+            'btn-cancel': 'Batal',
+            'btn-save': 'Simpan',
+            'modal-prompt': '<i class="fa-solid fa-wand-magic-sparkles"></i> Pustaka Prompt',
+            'modal-fav': '<i class="fa-solid fa-star"></i> Favorit',
+            'toast-lang': '🌐 Bahasa UI: Indonesia'
+        },
+        'en': {
+            'new-chat': '<i class="fa-solid fa-plus"></i> New Chat',
+            'recents': 'Recents',
+            'search-ph': 'Search messages…',
+            'welcome-desc': 'Your intelligent AI companion. Ask me anything.',
+            'sug-1': '<i class="fa-solid fa-brain"></i> Explain ML simply',
+            'sug-2': '<i class="fa-brands fa-python"></i> Python snippet',
+            'sug-3': '<i class="fa-solid fa-bolt"></i> Productivity tips',
+            'sug-4': '<i class="fa-solid fa-pen-nib"></i> Story idea',
+            'input-ph': 'Message Nova…',
+            'disclaimer': 'Nova AI may make mistakes. Powered by Google Gemini.',
+            'settings-title': 'Settings',
+            'sp-model': 'Model',
+            'sp-persona': 'Persona',
+            'sp-temp': 'Creativity',
+            'temp-1': 'Precise',
+            'temp-2': 'Creative',
+            'sp-lang': 'Language',
+            'sp-actions': 'Actions',
+            'btn-export': '<i class="fa-solid fa-download"></i> Export Chat',
+            'btn-fav': '<i class="fa-solid fa-star"></i> Favorites ',
+            'btn-clear': '<i class="fa-solid fa-trash"></i> Clear All',
+            'modal-rename': '<i class="fa-solid fa-pencil"></i> Rename Chat',
+            'btn-cancel': 'Cancel',
+            'btn-save': 'Save',
+            'modal-prompt': '<i class="fa-solid fa-wand-magic-sparkles"></i> Prompt Library',
+            'modal-fav': '<i class="fa-solid fa-star"></i> Favorites',
+            'toast-lang': '🌐 UI Language: English'
+        },
+        'ja': {
+            'new-chat': '<i class="fa-solid fa-plus"></i> 新しいチャット',
+            'recents': '最近',
+            'search-ph': 'メッセージを検索…',
+            'welcome-desc': 'インテリジェントなAIアシスタント。何でも聞いてください。',
+            'sug-1': '<i class="fa-solid fa-brain"></i> MLを簡単に説明',
+            'sug-2': '<i class="fa-brands fa-python"></i> Pythonスニペット',
+            'sug-3': '<i class="fa-solid fa-bolt"></i> 生産性のヒント',
+            'sug-4': '<i class="fa-solid fa-pen-nib"></i> ストーリーのアイデア',
+            'input-ph': 'Novaにメッセージ…',
+            'disclaimer': 'Nova AIは間違えることがあります。Google Geminiを搭載しています。',
+            'settings-title': '設定',
+            'sp-model': 'モデル',
+            'sp-persona': 'ペルソナ',
+            'sp-temp': '創造性',
+            'temp-1': '正確',
+            'temp-2': '創造的',
+            'sp-lang': '言語',
+            'sp-actions': 'アクション',
+            'btn-export': '<i class="fa-solid fa-download"></i> チャットをエクスポート',
+            'btn-fav': '<i class="fa-solid fa-star"></i> お気に入り ',
+            'btn-clear': '<i class="fa-solid fa-trash"></i> すべて消去',
+            'modal-rename': '<i class="fa-solid fa-pencil"></i> チャットの名前を変更',
+            'btn-cancel': 'キャンセル',
+            'btn-save': '保存',
+            'modal-prompt': '<i class="fa-solid fa-wand-magic-sparkles"></i> プロンプトライブラリ',
+            'modal-fav': '<i class="fa-solid fa-star"></i> お気に入り',
+            'toast-lang': '🌐 言語: 日本語'
+        },
+        'ko': {
+            'new-chat': '<i class="fa-solid fa-plus"></i> 새 채팅',
+            'recents': '최근',
+            'search-ph': '메시지 검색…',
+            'welcome-desc': '지능형 AI 컴패니언. 무엇이든 물어보세요.',
+            'sug-1': '<i class="fa-solid fa-brain"></i> ML을 쉽게 설명',
+            'sug-2': '<i class="fa-brands fa-python"></i> Python 스니펫',
+            'sug-3': '<i class="fa-solid fa-bolt"></i> 생산성 팁',
+            'sug-4': '<i class="fa-solid fa-pen-nib"></i> 스토리 아이디어',
+            'input-ph': 'Nova에게 메시지 보내기…',
+            'disclaimer': 'Nova AI는 실수를 할 수 있습니다. Google Gemini 제공.',
+            'settings-title': '설정',
+            'sp-model': '모델',
+            'sp-persona': '페르소나',
+            'sp-temp': '창의성',
+            'temp-1': '정확함',
+            'temp-2': '창의적',
+            'sp-lang': '언어',
+            'sp-actions': '작업',
+            'btn-export': '<i class="fa-solid fa-download"></i> 채팅 내보내기',
+            'btn-fav': '<i class="fa-solid fa-star"></i> 즐겨찾기 ',
+            'btn-clear': '<i class="fa-solid fa-trash"></i> 모두 지우기',
+            'modal-rename': '<i class="fa-solid fa-pencil"></i> 채팅 이름 바꾸기',
+            'btn-cancel': '취소',
+            'btn-save': '저장',
+            'modal-prompt': '<i class="fa-solid fa-wand-magic-sparkles"></i> 프롬프트 라이브러리',
+            'modal-fav': '<i class="fa-solid fa-star"></i> 즐겨찾기',
+            'toast-lang': '🌐 언어: 한국어'
+        },
+        'fr': {
+            'new-chat': '<i class="fa-solid fa-plus"></i> Nouvelle discussion',
+            'recents': 'Récents',
+            'search-ph': 'Rechercher…',
+            'welcome-desc': 'Votre assistant IA intelligent. Demandez-moi n’importe quoi.',
+            'sug-1': '<i class="fa-solid fa-brain"></i> Expliquer le ML',
+            'sug-2': '<i class="fa-brands fa-python"></i> Code Python',
+            'sug-3': '<i class="fa-solid fa-bolt"></i> Astuces de productivité',
+            'sug-4': '<i class="fa-solid fa-pen-nib"></i> Idée d’histoire',
+            'input-ph': 'Message à Nova…',
+            'disclaimer': 'Nova AI peut faire des erreurs. Propulsé par Google Gemini.',
+            'settings-title': 'Paramètres',
+            'sp-model': 'Modèle',
+            'sp-persona': 'Personnage',
+            'sp-temp': 'Créativité',
+            'temp-1': 'Précis',
+            'temp-2': 'Créatif',
+            'sp-lang': 'Langue',
+            'sp-actions': 'Actions',
+            'btn-export': '<i class="fa-solid fa-download"></i> Exporter',
+            'btn-fav': '<i class="fa-solid fa-star"></i> Favoris ',
+            'btn-clear': '<i class="fa-solid fa-trash"></i> Tout effacer',
+            'modal-rename': '<i class="fa-solid fa-pencil"></i> Renommer',
+            'btn-cancel': 'Annuler',
+            'btn-save': 'Enregistrer',
+            'modal-prompt': '<i class="fa-solid fa-wand-magic-sparkles"></i> Bibliothèque',
+            'modal-fav': '<i class="fa-solid fa-star"></i> Favoris',
+            'toast-lang': '🌐 Langue: Français'
+        }
+    };
+
+    function applyLanguage(lang) {
+        if (lang === 'auto') return; // Default is HTML fallback (English)
+        const t = translations[lang];
+        if (!t) return;
+
+        newChatBtn.innerHTML = t['new-chat'];
+        document.querySelector('.history-label').textContent = t['recents'];
+        searchInput.placeholder = t['search-ph'];
+        
+        const wDesc = welcomeScreen.querySelector('p');
+        if(wDesc) wDesc.textContent = t['welcome-desc'];
+        
+        const sugBtns = welcomeScreen.querySelectorAll('.sug-btn');
+        if (sugBtns.length===4) {
+            sugBtns[0].innerHTML = t['sug-1']; sugBtns[1].innerHTML = t['sug-2'];
+            sugBtns[2].innerHTML = t['sug-3']; sugBtns[3].innerHTML = t['sug-4'];
+        }
+
+        msgInput.placeholder = t['input-ph'];
+        document.querySelector('.input-disclaimer').textContent = t['disclaimer'];
+
+        document.querySelector('.sp-header span').textContent = t['settings-title'];
+        const spLabels = document.querySelectorAll('.sp-label');
+        if (spLabels[0]) spLabels[0].textContent = t['sp-model'];
+        if (spLabels[1]) spLabels[1].textContent = t['sp-persona'];
+        if (spLabels[2]) spLabels[2].childNodes[0].textContent = t['sp-temp'] + ' ';
+        if (spLabels[3]) spLabels[3].textContent = t['sp-lang'];
+        if (spLabels[4]) spLabels[4].textContent = t['sp-actions'];
+
+        const tempTags = document.querySelectorAll('.temp-tag');
+        if (tempTags[0]) tempTags[0].textContent = t['temp-1'];
+        if (tempTags[1]) tempTags[1].textContent = t['temp-2'];
+
+        exportBtn.innerHTML = t['btn-export'];
+        
+        // Preserve the fav badge
+        const favB = favFromSettings.querySelector('.fav-badge');
+        favFromSettings.innerHTML = t['btn-fav'];
+        if (favB) favFromSettings.appendChild(favB);
+
+        clearAllBtn.innerHTML = t['btn-clear'];
+
+        renameModal.querySelector('h3').innerHTML = t['modal-rename'];
+        renameCancel.textContent = t['btn-cancel'];
+        renameConfirm.textContent = t['btn-save'];
+
+        promptsModal.querySelector('h3').innerHTML = t['modal-prompt'];
+        favModal.querySelector('h3').innerHTML = t['modal-fav'];
+    }
+
     langSelect.addEventListener('change', () => {
         curLang = langSelect.value;
         localStorage.setItem('nova-lang', curLang);
-        toast('🌐 Language: ' + langSelect.options[langSelect.selectedIndex].text);
+        applyLanguage(curLang);
+        const code = curLang === 'auto' ? 'en' : curLang;
+        toast(translations[code]['toast-lang']);
     });
 
     /* ══════════════════════════════════════════════
